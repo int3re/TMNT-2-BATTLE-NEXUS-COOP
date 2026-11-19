@@ -1,0 +1,23 @@
+# Build output
+/build/
+/out/
+CMakeUserPresets.json
+
+# Visual Studio
+.vs/
+*.user
+
+# Release archives and installers are published on the Releases page, not in the repository
+*.zip
+tmnt2net-setup.exe
+
+# Never part of the repository: the Steamworks SDK and files of the game
+/steamworks_sdk*/
+TMNT2.exe
+*.DAT
+tmntsave*.dat
+
+# What the mod writes next to the game
+tmnt2net.log
+tmnt2net-sim.log
+tmnt2net-coop.rec
