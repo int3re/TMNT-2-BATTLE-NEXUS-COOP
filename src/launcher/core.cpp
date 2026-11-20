@@ -1,5 +1,5 @@
 // The launcher's work behind the picture: settings, the game folder and the mod in it, the newest release
-// (tmnt2net-latest.json of the GitHub release), its installer.
+// (tmnt2net-latest.json of the GitHub release), getting a newer launcher file and installing the mod from it.
 #include "launcher/launcher.h"
 
 #include <shellapi.h>
@@ -276,50 +276,27 @@ std::wstring quoted(std::wstring path) {
   return L"\"" + path + std::wstring(tail, L'\\') + L"\"";
 }
 
-// Runs the installer and waits for it.
-// In a folder this user may write to: without its windows. (The installers up to 0.17.0 write their
-// report to a console when they are quiet and fall over where there is none - after their work is done:
-// cmd.exe, itself unseen, gives them one.)
-// In a folder this user may not write to (Program Files): through the Windows prompt for administrator
-// rights, and in the open - Windows names the installer in its prompt, and it shows what it did.
-int run_setup(const std::wstring& setup, const wchar_t* verb, const std::wstring& dir, bool* denied) {
+// This launcher again, with the rights of an administrator (the Windows prompt), to put the mod into a
+// folder this user may not write to or take it out of there. Waits for it; its exit code.
+int run_elevated(const std::wstring& args, bool* denied) {
   *denied = false;
-  DWORD code = 99;
-  if (!writable(dir)) {
-    std::wstring args = std::wstring(verb) + L" " + quoted(dir);
-    SHELLEXECUTEINFOW sei{};
-    sei.cbSize = sizeof(sei);
-    sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
-    sei.lpVerb = L"runas";
-    sei.lpFile = setup.c_str();
-    sei.lpParameters = args.c_str();
-    sei.nShow = SW_SHOWNORMAL;
-    if (!ShellExecuteExW(&sei) || !sei.hProcess) {
-      *denied = true;
-      return 99;
-    }
-    WaitForSingleObject(sei.hProcess, INFINITE);
-    GetExitCodeProcess(sei.hProcess, &code);
-    CloseHandle(sei.hProcess);
-    return static_cast<int>(code);
-  }
-  wchar_t shell[MAX_PATH] = {};
-  if (!GetEnvironmentVariableW(L"ComSpec", shell, MAX_PATH) || !exists(shell)) {
-    GetSystemDirectoryW(shell, MAX_PATH);
-    wcscat_s(shell, L"\\cmd.exe");
-  }
-  std::wstring cmd = quoted(shell) + L" /d /s /c \"" + quoted(setup) + L" " + verb + L" " + quoted(dir) + L" /quiet\"";
-  STARTUPINFOW si{};
-  si.cb = sizeof(si);
-  PROCESS_INFORMATION pi{};
-  if (!CreateProcessW(shell, cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
-    if (GetLastError() == ERROR_ELEVATION_REQUIRED) *denied = true;
+  wchar_t self[MAX_PATH] = {};
+  GetModuleFileNameW(nullptr, self, MAX_PATH);
+  SHELLEXECUTEINFOW sei{};
+  sei.cbSize = sizeof(sei);
+  sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+  sei.lpVerb = L"runas";
+  sei.lpFile = self;
+  sei.lpParameters = args.c_str();
+  sei.nShow = SW_HIDE;
+  if (!ShellExecuteExW(&sei) || !sei.hProcess) {
+    *denied = true;
     return 99;
   }
-  WaitForSingleObject(pi.hProcess, INFINITE);
-  GetExitCodeProcess(pi.hProcess, &code);
-  CloseHandle(pi.hProcess);
-  CloseHandle(pi.hThread);
+  DWORD code = 99;
+  WaitForSingleObject(sei.hProcess, INFINITE);
+  GetExitCodeProcess(sei.hProcess, &code);
+  CloseHandle(sei.hProcess);
   return static_cast<int>(code);
 }
 
@@ -352,17 +329,19 @@ std::string hex_of_file(const std::wstring& path) {
   return sha256_file(path, h) ? to_hex(h, 32) : std::string();
 }
 
-// The installer of a release in the cache: there already (and whole), or downloaded now.
-Step fetch_setup(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
-                 const std::atomic<bool>& cancel, std::wstring* path) {
-  std::wstring setup = cached_setup(rel.version);
-  *path = setup;
+// The launcher file of a release, in the cache: there already (and whole), or downloaded now.
+Step fetch_package(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
+                   const std::atomic<bool>& cancel, std::wstring* path) {
+  std::wstring file = join(cache_dir(), L"tmnt2net-" + rel.version + L"-" +
+                                            (rel.pkg_sha256.empty() ? std::wstring(L"unchecked") : wide(rel.pkg_sha256.substr(0, 12))) +
+                                            L".exe");
+  *path = file;
   if (hooks.stage) hooks.stage(0);
-  bool have = exists(setup) && (rel.setup_sha256.empty() || hex_of_file(setup) == rel.setup_sha256);
+  bool have = !rel.pkg_sha256.empty() && exists(file) && hex_of_file(file) == rel.pkg_sha256;
   if (!have) {
-    std::wstring name = rel.setup_name.empty() ? L"tmnt2net-setup.exe" : rel.setup_name;
+    std::wstring name = rel.pkg_name.empty() ? L"tmnt2net-launcher.exe" : rel.pkg_name;
     std::wstring url = repo() + L"/releases/download/v" + rel.version + L"/" + name;
-    std::wstring part = setup + L".part";
+    std::wstring part = file + L".part";
     bool ok = false;
     for (const net::Route& r : routes(s, &first)) {
       if (cancel.load()) return Step::Cancelled;
@@ -374,18 +353,75 @@ Step fetch_setup(const Release& rel, const Settings& s, const net::Route& first,
       }
     }
     if (!ok) return Step::NetFail;
-    DeleteFileW(setup.c_str());
-    if (!MoveFileW(part.c_str(), setup.c_str())) return Step::NetFail;
+    DeleteFileW(file.c_str());
+    if (!MoveFileW(part.c_str(), file.c_str())) return Step::NetFail;
   } else if (hooks.progress) {
-    hooks.progress(rel.setup_size ? rel.setup_size : 1, rel.setup_size ? rel.setup_size : 1);
+    hooks.progress(rel.pkg_size ? rel.pkg_size : 1, rel.pkg_size ? rel.pkg_size : 1);
   }
   if (hooks.stage) hooks.stage(1);
-  if (!rel.setup_sha256.empty() && hex_of_file(setup) != rel.setup_sha256) {
-    DeleteFileW(setup.c_str());
+  if (!rel.pkg_sha256.empty() && hex_of_file(file) != rel.pkg_sha256) {
+    DeleteFileW(file.c_str());
     return Step::BadSum;
   }
   Sleep(350);  // (the step is seen)
   return Step::Ok;
+}
+
+// What a release's description says, into `out`. want_file: the launcher file's name, size and SHA-256
+// must be there (GitHub's description); without it only the words are read (the one inside a launcher).
+bool read_release(const std::string& json, Release& rel, bool want_file) {
+  Json j;
+  JsonReader r{json.data(), json.data() + json.size()};
+  if (json.size() >= 3 && !std::memcmp(json.data(), "\xEF\xBB\xBF", 3)) r.p += 3;
+  if (!r.value(j, 0) || j.type != Json::Obj) return false;
+  Release out;
+  out.version = wide(j.str("version"));
+  if (!version_text(out.version)) return false;
+  out.known = true;
+  out.protocol = static_cast<int>(j.num("protocol"));
+  out.date = date_text(j.str("date"));
+  out.title = clipped(j.str("title"), 90);
+  if (const Json* notes = j.get("notes"))
+    for (const Json& n : notes->a)
+      if (n.type == Json::Str && out.notes.size() < 6) out.notes.push_back(clipped(n.s, 220));
+  // The file to download: the launcher itself. ("setup" names the same file for launcher 1.0.0, which
+  // ran what it downloaded as an installer.)
+  for (const char* key : {"launcher", "setup"}) {
+    const Json* f = j.get(key);
+    if (!f || out.full) continue;
+    std::wstring name = wide(f->str("name"));
+    bool fine = !name.empty() && name.size() <= 64 && name.size() > 4 && _wcsicmp(name.c_str() + name.size() - 4, L".exe") == 0;
+    for (wchar_t ch : name)
+      if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || ch == L'.' || ch == L'-' ||
+            ch == L'_'))
+        fine = false;
+    std::string sha = f->str("sha256");
+    for (char& ch : sha)
+      if (ch >= 'A' && ch <= 'F') ch = static_cast<char>(ch - 'A' + 'a');
+    bool hex = sha.size() == 64;
+    for (char ch : sha)
+      if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) hex = false;
+    double size = f->num("size");
+    if (fine && hex && size > 0 && size < 512.0 * 1024 * 1024) {
+      out.pkg_name = name;
+      out.pkg_sha256 = sha;
+      out.pkg_size = static_cast<uint64_t>(size);
+      out.full = true;
+    }
+  }
+  if (const Json* l = j.get("launcher")) {
+    std::wstring v = wide(l->str("version"));
+    if (version_text(v)) out.launcher_version = v;
+  }
+  if (const Json* p = j.get("protocols"))
+    for (auto& kv : p->o) {
+      std::wstring v = wide(kv.first);
+      if (version_text(v) && kv.second.type == Json::Num && out.protocols.size() < 200)
+        out.protocols.emplace_back(v, static_cast<int>(kv.second.n));
+    }
+  if (want_file && !out.full) return false;
+  rel = out;
+  return true;
 }
 
 // The game holds the mod's files while it runs: wait for it to close.
@@ -669,56 +705,34 @@ bool pick_folder(HWND owner, const std::wstring& initial, std::wstring& out) {
   return ok;
 }
 
-bool parse_manifest(const std::string& json, Release& rel) {
-  Json j;
-  JsonReader r{json.data(), json.data() + json.size()};
-  if (json.size() >= 3 && !std::memcmp(json.data(), "\xEF\xBB\xBF", 3)) r.p += 3;
-  if (!r.value(j, 0) || j.type != Json::Obj) return false;
-  Release out;
-  out.version = wide(j.str("version"));
-  if (!version_text(out.version)) return false;
-  out.known = true;
-  out.protocol = static_cast<int>(j.num("protocol"));
-  out.date = date_text(j.str("date"));
-  out.title = clipped(j.str("title"), 90);
-  if (const Json* notes = j.get("notes"))
-    for (const Json& n : notes->a)
-      if (n.type == Json::Str && out.notes.size() < 6) out.notes.push_back(clipped(n.s, 220));
-  if (const Json* setup = j.get("setup")) {
-    std::wstring name = wide(setup->str("name"));
-    bool fine = !name.empty() && name.size() <= 64 && name.size() > 4 && _wcsicmp(name.c_str() + name.size() - 4, L".exe") == 0;
-    for (wchar_t ch : name)
-      if (!((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || ch == L'.' || ch == L'-' ||
-            ch == L'_'))
-        fine = false;
-    std::string sha = setup->str("sha256");
-    for (char& ch : sha)
-      if (ch >= 'A' && ch <= 'F') ch = static_cast<char>(ch - 'A' + 'a');
-    bool hex = sha.size() == 64;
-    for (char ch : sha)
-      if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) hex = false;
-    double size = setup->num("size");
-    if (fine && hex && size > 0 && size < 512.0 * 1024 * 1024) {
-      out.setup_name = name;
-      out.setup_sha256 = sha;
-      out.setup_size = static_cast<uint64_t>(size);
-      out.full = true;
+bool parse_manifest(const std::string& json, Release& rel) { return read_release(json, rel, true); }
+
+// The mod inside this launcher: its version from the package itself, the words from its release.json.
+const Release& bundled() {
+  static Release mine;
+  static bool read = false;
+  if (!read) {
+    read = true;
+    pkg::Package p;
+    if (p.open(L"")) {
+      Release words;
+      if (read_release(p.info, words, false) && words.version == p.version) mine = words;
+      mine.known = true;
+      mine.full = false;
+      mine.version = p.version;
+      mine.protocol = p.protocol;
+      mine.launcher_version = kLauncherVersion;
     }
   }
-  if (const Json* l = j.get("launcher")) {
-    std::wstring v = wide(l->str("version"));
-    if (version_text(v)) out.launcher_version = v;
-  }
-  if (const Json* p = j.get("protocols"))
-    for (auto& kv : p->o) {
-      std::wstring v = wide(kv.first);
-      if (version_text(v) && kv.second.type == Json::Num && out.protocols.size() < 200)
-        out.protocols.emplace_back(v, static_cast<int>(kv.second.n));
-    }
-  if (!out.full) return false;
-  rel = out;
-  return true;
+  return mine;
 }
+
+bool newer_on_github(const Release& rel, bool assets_blocked) {
+  const Release& mine = bundled();
+  return rel.known && !assets_blocked && (!mine.known || compare_versions(rel.version, mine.version) > 0);
+}
+
+const Release& target(const Release& rel, bool assets_blocked) { return newer_on_github(rel, assets_blocked) ? rel : bundled(); }
 
 CheckResult check(const Settings& s, const std::atomic<bool>& cancel) {
   CheckResult out;
@@ -757,7 +771,7 @@ CheckResult check(const Settings& s, const std::atomic<bool>& cancel) {
         out.rel.known = true;
         out.rel.version = v;
         out.rel.protocol = known_protocol(out.rel, v);
-        out.rel.setup_name = L"tmnt2net-setup.exe";
+        out.rel.pkg_name = L"tmnt2net-launcher.exe";
         out.assets_blocked = !no_description;
         out.route = r;
         return out;
@@ -767,49 +781,97 @@ CheckResult check(const Settings& s, const std::atomic<bool>& cancel) {
   return out;
 }
 
-std::wstring cached_setup(const std::wstring& version) { return join(cache_dir(), L"tmnt2net-setup-" + version + L".exe"); }
-
-Step install(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
-             const std::atomic<bool>& cancel, int* exit_code, std::wstring* setup_path) {
-  *exit_code = 0;
-  std::wstring setup;
-  Step st = fetch_setup(rel, s, first, hooks, cancel, &setup);
-  if (setup_path) *setup_path = setup;
-  if (st != Step::Ok) return st;
-  if (hooks.stage) hooks.stage(2);
-  st = wait_for_game(s.game_dir, hooks, cancel);
-  if (st != Step::Ok) return st;
-  if (cancel.load()) return Step::Cancelled;
-  bool denied = false;
-  *exit_code = run_setup(setup, L"/install", s.game_dir, &denied);
-  if (denied) return Step::Denied;
-  // What is in the folder now says more than the installer's code.
-  Installed now = read_installed(s.game_dir);
-  return *exit_code == 0 || (now.present && now.version == rel.version) ? Step::Ok : Step::SetupFail;
-}
-
-Step uninstall(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
-               const std::atomic<bool>& cancel, int* exit_code) {
-  *exit_code = 0;
-  // Any installer of the mod removes it: the one of the installed version if it is still in the cache,
-  // else the newest release's.
-  Installed in = read_installed(s.game_dir);
-  std::wstring setup = in.version.empty() ? L"" : cached_setup(in.version);
-  if (setup.empty() || !exists(setup)) {
-    if (!rel.known) return Step::NoSetup;
-    Step st = fetch_setup(rel, s, first, hooks, cancel, &setup);
+// Puts the mod into the game folder: from the newer launcher file of the release (downloaded first and
+// checked) or from this launcher itself.
+Step install(const Release& rel, bool download, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
+             const std::atomic<bool>& cancel, std::wstring* log, std::wstring* package_file) {
+  std::wstring file;  // (empty: this launcher)
+  if (download) {
+    Step st = fetch_package(rel, s, first, hooks, cancel, &file);
     if (st != Step::Ok) return st;
   } else {
-    if (hooks.stage) hooks.stage(1);
+    if (hooks.stage) hooks.stage(1);  // (nothing to download: the mod is in this launcher)
+    Sleep(450);
   }
+  pkg::Package p;
+  if (!p.open(file) || (download && p.version != rel.version)) {
+    *log += download ? L"в скачанном файле нет мода версии " + rel.version + L"\n" : L"в этом лаунчере нет мода\n";
+    if (download) DeleteFileW(file.c_str());
+    return Step::BadPackage;
+  }
+  if (package_file) *package_file = file;
   if (hooks.stage) hooks.stage(2);
   Step st = wait_for_game(s.game_dir, hooks, cancel);
   if (st != Step::Ok) return st;
   if (cancel.load()) return Step::Cancelled;
-  bool denied = false;
-  *exit_code = run_setup(setup, L"/uninstall", s.game_dir, &denied);
-  if (denied) return Step::Denied;
-  return *exit_code == 0 || !read_installed(s.game_dir).present ? Step::Ok : Step::SetupFail;
+  if (!writable(s.game_dir)) {
+    bool denied = false;
+    int code = run_elevated(L"/install " + quoted(s.game_dir) + L" /quiet" + (file.empty() ? L"" : L" /package " + quoted(file)), &denied);
+    if (denied) return Step::Denied;
+    Installed now = read_installed(s.game_dir);
+    if (code == 0 || (now.present && now.version == p.version)) return Step::Ok;
+    *log += L"установка с правами администратора не удалась (код " + std::to_wstring(code) + L")\n";
+    return Step::Failed;
+  }
+  pkg::Result r = pkg::install(p, s.game_dir, *log);
+  return r == pkg::Result::Ok ? Step::Ok : r == pkg::Result::Denied ? Step::Denied : Step::Failed;
+}
+
+Step uninstall(const Settings& s, const UpdateHooks& hooks, const std::atomic<bool>& cancel, std::wstring* log) {
+  if (hooks.stage) hooks.stage(2);
+  Step st = wait_for_game(s.game_dir, hooks, cancel);
+  if (st != Step::Ok) return st;
+  if (cancel.load()) return Step::Cancelled;
+  if (!writable(s.game_dir)) {
+    bool denied = false;
+    int code = run_elevated(L"/uninstall " + quoted(s.game_dir) + L" /quiet", &denied);
+    if (denied) return Step::Denied;
+    if (code == 0 || !read_installed(s.game_dir).present) return Step::Ok;
+    *log += L"удаление с правами администратора не удалось (код " + std::to_wstring(code) + L")\n";
+    return Step::Failed;
+  }
+  Sleep(400);  // (the step is seen)
+  pkg::Result r = pkg::uninstall(s.game_dir, *log);
+  return r == pkg::Result::Ok ? Step::Ok : r == pkg::Result::Denied ? Step::Denied : Step::Failed;
+}
+
+// A newer launcher alone (the mod is the same): downloaded, checked, put in this one's place.
+Step fetch_launcher(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
+                    const std::atomic<bool>& cancel, std::wstring* log, std::wstring* package_file) {
+  std::wstring file;
+  Step st = fetch_package(rel, s, first, hooks, cancel, &file);
+  if (st != Step::Ok) return st;
+  pkg::Package p;
+  if (!p.open(file)) {
+    *log += L"скачанный файл — не лаунчер tmnt2net\n";
+    DeleteFileW(file.c_str());
+    return Step::BadPackage;
+  }
+  if (hooks.stage) hooks.stage(2);
+  Sleep(300);
+  if (package_file) *package_file = file;
+  return Step::Ok;
+}
+
+// This launcher's own file becomes `newer`. The running one is renamed aside (Windows lets a running
+// program be renamed) and removed at the next start.
+bool replace_self(const std::wstring& newer) {
+  wchar_t self[MAX_PATH] = {};
+  GetModuleFileNameW(nullptr, self, MAX_PATH);
+  std::wstring old = std::wstring(self) + L".old";
+  DeleteFileW(old.c_str());
+  if (!MoveFileExW(self, old.c_str(), MOVEFILE_REPLACE_EXISTING)) return false;
+  if (!CopyFileW(newer.c_str(), self, TRUE)) {
+    MoveFileExW(old.c_str(), self, MOVEFILE_REPLACE_EXISTING);
+    return false;
+  }
+  return true;
+}
+
+void drop_old_self() {
+  wchar_t self[MAX_PATH] = {};
+  GetModuleFileNameW(nullptr, self, MAX_PATH);
+  DeleteFileW((std::wstring(self) + L".old").c_str());
 }
 
 }  // namespace core

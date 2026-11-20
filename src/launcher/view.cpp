@@ -84,7 +84,7 @@ std::wstring megabytes(uint64_t bytes) {
 
 struct Vals {
   bool offer = false, arrow = false, equal = false, has_new = false;
-  std::wstring installed, installed_note, latest, latest_note;
+  std::wstring installed, installed_note, latest, latest_note, latest_label;
   uint32_t latest_border = LINE;
   int compat = 0;  // 1 warning (accent), 2 fine (green), 3 waiting, 4 bad (red), 5 plain
   std::wstring compat_text;
@@ -103,13 +103,13 @@ struct Vals {
 
 std::wstring proto_note(int protocol) { return protocol ? L"протокол " + std::to_wstring(protocol) : L""; }
 
-void news(const Model& m, Vals& v, const wchar_t* tab) {
+void news(const Release& r, Vals& v, const wchar_t* tab) {
   v.tab = tab;
-  v.meta = m.rel.version + (m.rel.date.empty() ? L"" : L" · " + m.rel.date);
-  v.title = m.rel.title;
-  v.items = m.rel.notes;
+  v.meta = r.version + (r.date.empty() ? L"" : L" · " + r.date);
+  v.title = r.title;
+  v.items = r.notes;
   if (v.items.empty()) {  // (a release without its description: an old one)
-    v.title = L"Версия " + m.rel.version;
+    v.title = L"Версия " + r.version;
     v.items = {L"Что в ней изменилось — на странице релиза на GitHub."};
   }
   v.link = L"Все изменения на GitHub";
@@ -120,17 +120,20 @@ void how_it_works(Vals& v) {
   v.tab = L"КАК ЭТО РАБОТАЕТ";
   v.meta = L"tmnt2net";
   v.title = L"Лаунчер мода";
-  v.items = {L"При запуске спрашивает у GitHub, какая версия мода последняя.",
-             L"Скачивает установщик, сверяет SHA-256 и ставит мод в папку игры.",
+  v.items = {L"Мод лежит внутри лаунчера: ставится в папку игры одной кнопкой.",
+             L"При запуске лаунчер спрашивает у GitHub, не вышла ли версия новее.",
              L"Игра по сети — пункт СЕТЕВАЯ ИГРА в главном меню игры."};
   v.link = L"Страница мода на GitHub";
   v.link_url = kRepoUrl;
 }
 
-// The notes of the version that is installed: the release's if it is that version, else the kept ones.
+// The notes of the version that is installed: GitHub's or this launcher's if they are of that version,
+// else the ones kept from the day it was installed.
 void installed_news(const Model& m, Vals& v) {
-  if (m.rel.full && m.inst.present && m.rel.version == m.inst.version && !m.rel.notes.empty()) {
-    news(m, v, L"В ЭТОЙ ВЕРСИИ");
+  if (m.inst.present && m.rel.known && m.rel.version == m.inst.version && !m.rel.notes.empty()) {
+    news(m.rel, v, L"В ЭТОЙ ВЕРСИИ");
+  } else if (m.inst.present && m.pack.known && m.pack.version == m.inst.version && !m.pack.notes.empty()) {
+    news(m.pack, v, L"В ЭТОЙ ВЕРСИИ");
   } else if (m.inst.present && !m.set.notes.empty() && m.set.notes_version == m.inst.version) {
     v.tab = L"В ЭТОЙ ВЕРСИИ";
     v.meta = m.inst.version + L" · установлена";
@@ -143,22 +146,51 @@ void installed_news(const Model& m, Vals& v) {
   }
 }
 
+// What there is to install: GitHub's version when it is newer than the one inside this launcher and its
+// file can be had (it is downloaded then), else the one inside.
+bool from_github(const Model& m) {
+  return m.rel.known && !m.assets_blocked && (!m.pack.known || core::compare_versions(m.rel.version, m.pack.version) > 0);
+}
+const Release& offer(const Model& m) { return from_github(m) ? m.rel : m.pack; }
+
 Vals vals(const Model& m) {
   Vals v;
   Screen s = m.screen == Screen::Settings ? m.back : m.screen;
   const uint32_t accent = kBandana[m.set.accent & 3];
+  const Release& t = offer(m);
+  const bool download = from_github(m);
   std::wstring have = m.inst.version.empty() ? L"" : m.inst.version;
   std::wstring play_on = have.empty() ? L"ИГРАТЬ" : L"ИГРАТЬ НА " + have;
   v.installed = !m.inst.present ? L"нет" : have.empty() ? L"?" : have;
   v.installed_note = !m.inst.present ? L"мод не установлен" : have.empty() ? L"версия неизвестна" : proto_note(m.inst.protocol);
+  v.latest_label = L"НА GITHUB";
   v.latest = m.rel.known ? m.rel.version : L"—";
   v.latest_note = m.rel.known ? proto_note(m.rel.protocol) : L"нет ответа";
   v.path = m.has_game ? m.set.game_dir : L"(папка не выбрана)";
-  std::wstring setup_hint = (m.rel.setup_name.empty() ? L"tmnt2net-setup.exe" : m.rel.setup_name) +
-                            (m.rel.setup_size ? L" · " + megabytes(m.rel.setup_size) + L" МБ" : L"") +
-                            (m.rel.setup_sha256.empty() ? L" · в релизе нет контрольной суммы" : L" · после загрузки сверяется SHA-256");
+  std::wstring how = download ? (t.pkg_size ? megabytes(t.pkg_size) + L" МБ с GitHub" : std::wstring(L"Файл с GitHub")) +
+                                    (t.pkg_sha256.empty() ? L" · в релизе нет контрольной суммы" : L" · после загрузки сверяется SHA-256")
+                              : L"Версия " + t.version + L" уже внутри лаунчера: скачивать ничего не нужно.";
   std::wstring checked = m.checked_at.empty() ? L"GitHub: проверено только что"
                                              : L"GitHub: проверено в " + m.checked_at + (m.via.empty() ? L"" : L", " + m.via);
+  // The footer's line where an answer of GitHub is not what the screen is about.
+  auto github = [&]() {
+    if (m.rechecking) {
+      v.net = L"GitHub: проверяю";
+      v.net_state = 1;
+    } else if (m.rel.known && !m.assets_blocked) {
+      v.net = checked;
+    } else {
+      v.net = m.assets_blocked ? L"GitHub: файлы не скачиваются" : L"GitHub: нет ответа";
+      v.net_state = 2;
+    }
+  };
+  // The right box, when the version to install is the one inside this launcher.
+  auto inside = [&]() {
+    if (download || (m.rel.known && m.rel.version == t.version)) return;
+    v.latest_label = L"В ЭТОМ ЛАУНЧЕРЕ";
+    v.latest = t.version;
+    v.latest_note = proto_note(t.protocol);
+  };
   switch (s) {
     case Screen::Checking:
       v.offer = v.arrow = true;
@@ -167,15 +199,10 @@ Vals vals(const Model& m) {
       v.latest_border = EDGE;
       v.compat = 3;
       v.compat_text = L"Спрашиваю у GitHub, какая версия последняя.";
-      if (m.inst.present) {
-        v.primary = play_on;
-        v.icon = 2;
-        v.hint = L"Играть можно сразу: проверка идёт в фоне и запуск не задерживает.";
-      } else {
-        v.primary = L"ЖДУ ОТВЕТА GITHUB";
-        v.primary_on = false;
-        v.hint = L"Как только GitHub ответит, лаунчер предложит поставить мод.";
-      }
+      v.primary = play_on;
+      v.icon = 2;
+      v.primary_on = m.inst.present;
+      v.hint = L"Играть можно сразу: проверка идёт в фоне и запуск не задерживает.";
       installed_news(m, v);
       v.net = L"GitHub: проверяю";
       v.net_state = 1;
@@ -183,40 +210,43 @@ Vals vals(const Model& m) {
     case Screen::Update:
       v.offer = v.arrow = v.has_new = true;
       v.latest_border = accent;
-      if (m.inst.protocol && m.rel.protocol && m.inst.protocol != m.rel.protocol) {
+      inside();
+      if (m.inst.protocol && t.protocol && m.inst.protocol != t.protocol) {
         v.compat = 1;
         v.compat_text = L"Протокол новый: с " + have + L" по сети не соединяется. Обновитесь всей командой.";
-      } else if (m.inst.protocol && m.inst.protocol == m.rel.protocol) {
+      } else if (m.inst.protocol && m.inst.protocol == t.protocol) {
         v.compat = 2;
         v.compat_text = L"Протокол тот же: с друзьями на " + have + L" играть можно.";
       } else {
         v.compat = 5;
-        v.compat_text = L"Вышла новая версия мода.";
+        v.compat_text = L"Есть версия мода новее установленной.";
       }
-      v.primary = L"ОБНОВИТЬ ДО " + m.rel.version;
+      v.primary = L"ОБНОВИТЬ ДО " + t.version;
       v.icon = 1;
       v.secondary = play_on;
-      v.hint = setup_hint;
-      news(m, v, L"ЧТО НОВОГО");
+      v.hint = how;
+      news(t, v, L"ЧТО НОВОГО");
       v.copy = true;
-      v.net = checked;
+      github();
       break;
     case Screen::Install:
       v.offer = v.arrow = v.has_new = true;
       v.latest_border = accent;
+      inside();
       v.compat = 2;
       v.compat_text = L"Файлы игры не меняются: мод ставится рядом и убирается одной кнопкой.";
-      v.primary = L"УСТАНОВИТЬ МОД " + m.rel.version;
+      v.primary = L"УСТАНОВИТЬ МОД " + t.version;
       v.icon = 1;
-      v.hint = setup_hint;
-      news(m, v, L"ЧТО НОВОГО");
-      v.net = checked;
+      v.hint = how;
+      news(t, v, L"ЧТО НОВОГО");
+      github();
       break;
     case Screen::Downloading:
-      if (m.rel.full) news(m, v, L"ЧТО НОВОГО");
-      else how_it_works(v);
-      v.copy = m.rel.full;
-      v.net = m.stage == 0 ? L"GitHub: идёт загрузка" : L"GitHub: файл получен";
+      if (m.pending == Pending::Uninstall) installed_news(m, v);
+      else news(m.pending == Pending::Launcher ? m.rel : t, v, L"ЧТО НОВОГО");
+      v.copy = m.rel.known;
+      v.net = !m.total ? L"Мод: из этого лаунчера" : m.stage == 0 ? L"GitHub: идёт загрузка" : L"GitHub: файл получен";
+      if (m.pending == Pending::Uninstall) v.net = L"Мод убирается из папки игры";
       break;
     case Screen::Ready:
       v.offer = true;
@@ -250,26 +280,21 @@ Vals vals(const Model& m) {
       v.latest_border = EDGE;
       v.compat = 4;
       if (m.assets_blocked) {
-        v.latest_note = L"файлы недоступны";
+        v.latest_note = L"файл недоступен";
         v.compat_text = L"GitHub отвечает, но файлы релиза не отдаёт. Включите прокси в настройках.";
       } else {
         v.compat_text = L"GitHub не отвечает. Какая версия последняя — неизвестно.";
       }
-      if (m.inst.present) {
-        v.primary = play_on;
-        v.icon = 2;
-        v.secondary = L"ПОВТОРИТЬ ПРОВЕРКУ";
-        v.hint = L"Проверка обновлений игре не нужна: мод работает как раньше.";
-      } else {
-        v.primary = L"ПОВТОРИТЬ ПРОВЕРКУ";
-        v.hint = L"Без ответа GitHub мод не скачать: проверьте интернет или включите прокси.";
-      }
+      v.primary = play_on;
+      v.icon = 2;
+      v.secondary = L"ПОВТОРИТЬ ПРОВЕРКУ";
+      v.hint = L"Проверка обновлений игре не нужна: мод работает как раньше.";
       v.tab = L"НЕТ СВЯЗИ";
       v.meta = m.assets_blocked ? L"файлы GitHub не скачиваются" : L"github.com не отвечает";
       v.title = L"Что можно сделать";
       v.items = {L"Повторить позже: лаунчер проверяет обновления при каждом запуске.",
                  L"Включить прокси в настройках — автоматически или свой.",
-                 L"Скачать tmnt2net-setup.exe в браузере: он ставит мод и без лаунчера."};
+                 L"Скачать новый лаунчер в браузере: мод уже внутри него."};
       v.link = L"Страница релиза в браузере";
       v.link_url = std::wstring(kRepoUrl) + L"/releases/latest";
       v.net = m.assets_blocked ? L"GitHub: файлы не скачиваются" : L"GitHub: нет ответа";
@@ -285,12 +310,12 @@ Vals vals(const Model& m) {
       v.tab = L"ТРИ ШАГА";
       v.meta = L"первый запуск";
       v.title = L"Как это работает";
-      v.items = {L"Укажите папку игры.", L"Лаунчер скачает последнюю версию мода с GitHub и поставит её.",
+      v.items = {L"Укажите папку игры.", L"Лаунчер поставит мод: он уже внутри. Если на GitHub есть новее — скачает.",
                  L"Запустите игру: в главном меню появится СЕТЕВАЯ ИГРА."};
       v.link = L"Инструкция на GitHub";
       v.link_url = kRepoUrl;
-      v.net = m.rel.known ? L"GitHub: последняя версия " + m.rel.version : L"GitHub: проверка после выбора папки";
-      v.net_state = m.rel.known ? 0 : 1;
+      github();
+      if (m.rel.known && !m.rechecking) v.net = L"GitHub: последняя версия " + m.rel.version;
       break;
     case Screen::Running:
       v.notice = true;
@@ -301,10 +326,11 @@ Vals vals(const Model& m) {
         v.net = L"Мод ждёт, пока игра закроется";
         v.net_state = 1;
       } else {
-        v.notice_text = L"Версия " + m.rel.version + L" скачана и проверена. Закройте игру — установка начнётся сама.";
+        v.notice_text = L"Версия " + t.version + (m.total ? L" скачана и проверена" : L" готова к установке") +
+                        L". Закройте игру — установка начнётся сама.";
         v.primary = L"ЗАКРЫТЬ ИГРУ И ОБНОВИТЬ";
         v.icon = 1;
-        v.net = L"GitHub: " + m.rel.version + L" скачана и проверена";
+        v.net = m.total ? L"GitHub: " + t.version + L" скачана и проверена" : L"Мод " + t.version + L" ждёт, пока игра закроется";
       }
       v.secondary = L"ПОЗЖЕ";
       v.hint = L"В сетевой игре остальные останутся без вас: сначала предупредите команду.";
@@ -324,7 +350,7 @@ Vals vals(const Model& m) {
       v.primary = m.problem_primary;
       v.secondary = m.problem_secondary;
       v.hint = L"Игра и её файлы не тронуты: мод либо стоит прежний, либо не стоит вовсе.";
-      if (m.rel.full) news(m, v, L"ЧТО НОВОГО");
+      if (t.known) news(t, v, L"ЧТО НОВОГО");
       else how_it_works(v);
       v.net = L"Не получилось";
       v.net_state = 2;
@@ -464,8 +490,13 @@ void footer(Ctx& x, const Vals& v) {
   // the right end: the four bandanas, before them a line of small print
   const float sx = kW - 16 - (4 * 16 + 3 * 3);
   stripes(c, sx, cy, 16, 6, 3);
-  if (m.rel.known && !m.rel.launcher_version.empty() && core::compare_versions(m.rel.launcher_version, kLauncherVersion) > 0) {
-    std::wstring s = L"Вышел лаунчер " + m.rel.launcher_version + L" — скачать";
+  if (m.swapped) {
+    const wchar_t* s = L"Новый лаунчер откроется при следующем запуске";
+    c.text_mid(s, f, sx - 14 - c.measure(s, f).width, cy, MUTED);
+  } else if (m.rel.full && !from_github(m) && !m.rel.launcher_version.empty() && m.screen != Screen::Downloading &&
+             core::compare_versions(m.rel.launcher_version, kLauncherVersion) > 0) {
+    // (a newer launcher with the same mod; with a newer mod it comes along with the update)
+    std::wstring s = L"Вышел лаунчер " + m.rel.launcher_version + L" — обновить";
     TextOpt u;
     u.underline = true;
     float w = c.measure(s, f).width;
@@ -554,7 +585,8 @@ void downloading(Ctx& x, float top) {
   const Model& m = x.m;
   const float left = 40, right = 580;
   // the three steps
-  const wchar_t* labels[3] = {L"Загрузка", L"Проверка SHA-256", m.pending == Pending::Uninstall ? L"Удаление" : L"Установка"};
+  const wchar_t* labels[3] = {L"Загрузка", L"Проверка", m.pending == Pending::Uninstall ? L"Удаление"
+                                                        : m.pending == Pending::Launcher ? L"Замена лаунчера" : L"Установка"};
   float sx = left;
   Font lab = T(12, 600);
   for (int i = 0; i < 3; ++i) {
@@ -584,11 +616,12 @@ void downloading(Ctx& x, float top) {
   c.pop();
   std::wstring stage;
   if (m.stage == 0)
-    stage = m.total ? megabytes(m.got) + L" из " + megabytes(m.total) + L" МБ" : megabytes(m.got) + L" МБ";
+    stage = m.total ? megabytes(m.got) + L" из " + megabytes(m.total) + L" МБ" : std::wstring(L"мод уже в лаунчере");
   else if (m.stage == 1)
-    stage = L"сверяю SHA-256";
+    stage = m.total ? L"сверяю SHA-256" : L"проверяю, что внутри";
   else
-    stage = m.pending == Pending::Uninstall ? L"убираю файлы мода из папки игры" : L"ставлю файлы в папку игры";
+    stage = m.pending == Pending::Uninstall ? L"убираю файлы мода из папки игры"
+            : m.pending == Pending::Launcher ? L"меняю файл лаунчера" : L"ставлю файлы в папку игры";
   Font sf = Mo(13, 500);
   c.text(stage, sf, right - c.measure(stage, sf).width, y + 40 - c.line_h(sf), TEXT2);
   // the canister of mutagen
@@ -625,7 +658,8 @@ void downloading(Ctx& x, float top) {
   TextOpt url;
   url.ellipsis = true;
   url.max_w = right - left - 16 - cw;
-  c.text_mid(std::wstring(kRepoText) + L"/releases/latest", Mo(12, 500), left, y + 22, MUTED, url);
+  c.text_mid(m.total ? std::wstring(kRepoText) + L"/releases/latest" : std::wstring(L"tmnt2net-launcher.exe: мод внутри"), Mo(12, 500),
+             left, y + 22, MUTED, url);
   ghost_button(x, H_Cancel, L"ОТМЕНА", right - cw, y, 44, 18, false);
   y += 44 + 14;
   TextOpt note;
@@ -633,7 +667,8 @@ void downloading(Ctx& x, float top) {
   note.max_w = right - left;
   note.line_h = 12 * 1.45f;
   c.text(m.pending == Pending::Uninstall ? L"Файлы игры, её сохранения и настройки остаются на месте."
-                                         : L"Перед установкой лаунчер попросит закрыть игру. Настройки и сохранения остаются.",
+         : m.pending == Pending::Launcher ? L"Новый лаунчер откроется при следующем запуске. Мод в игре не меняется."
+                                          : L"Перед установкой лаунчер попросит закрыть игру. Настройки и сохранения остаются.",
          T(12), left, y, MUTED, note);
 }
 
@@ -760,7 +795,7 @@ void hero(Ctx& x, const Vals& v) {
       if (v.arrow) c.icon(kArrow, left + bw + 12, y + bh / 2 - 14, 28, x.accent, 2.6f);
       if (v.equal) c.icon(kEqual, left + bw + 12, y + bh / 2 - 14, 28, GREEN, 2.6f);
       float rx = left + bw + 12 + 28 + 12;
-      version_box(x, rx, y, bw, bh, L"НА GITHUB", v.latest, v.latest_note, v.latest_border);
+      version_box(x, rx, y, bw, bh, v.latest_label.c_str(), v.latest, v.latest_note, v.latest_border);
       if (v.has_new) {
         Font bf = T(10, 700, 0.12f);
         float tw = c.measure(L"НОВАЯ", bf).width, bh2 = 2 + 2 + c.line_h(bf) + 2 + 2;
@@ -1012,15 +1047,21 @@ bool demo(const std::wstring& screen, Model& m) {
   m.rel.title = L"Ровная игра по сети";
   m.rel.notes = {L"Чужой высокий пинг больше не тормозит игру у всех.", L"Враги рядом с любым игроком дерутся как обычно.",
                  L"Alt+Tab больше не останавливает сетевую игру."};
-  m.rel.setup_name = L"tmnt2net-setup.exe";
-  m.rel.setup_size = 5224448;
-  m.rel.setup_sha256 = "x";
+  m.rel.pkg_name = L"tmnt2net-launcher.exe";
+  m.rel.pkg_size = 5900000;
+  m.rel.pkg_sha256 = "x";
+  m.pack.known = true;
+  m.pack.version = L"0.16.7";
+  m.pack.protocol = 14;
+  m.pack.title = L"Перепроверка 0.16.6";
+  m.pack.notes = {L"Убран остаток прошлой сессии: игра не путает, кто вошёл посреди игры.",
+                  L"Сообщение «игра идёт медленно» не появляется зря в начале сессии."};
   m.set.notes_version = L"0.16.7";
   m.set.notes_title = L"Перепроверка 0.16.6";
   m.set.notes = {L"Убран остаток прошлой сессии: игра не путает, кто вошёл посреди игры.",
                  L"Сообщение «игра идёт медленно» не появляется зря в начале сессии."};
-  m.total = 5224448;
-  m.got = static_cast<uint64_t>(5224448 * 0.62);
+  m.total = 5900000;
+  m.got = static_cast<uint64_t>(5900000 * 0.62);
   if (screen == L"update") {
     m.screen = Screen::Update;
   } else if (screen == L"downloading") {

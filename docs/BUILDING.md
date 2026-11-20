@@ -86,7 +86,7 @@ cmake --build build --config Release
 | `tmnt2net.ini` | настройки по умолчанию, из `dist/` |
 | `tmnt2net-README.md` | описание для игроков, из `dist/README.md` |
 | `steam_api.dll` | только при сборке со Steam |
-| `tmnt2net-setup.exe` | установщик: всё перечисленное лежит внутри него |
+| `tmnt2net-launcher.exe` | [лаунчер](LAUNCHER.md): всё перечисленное лежит внутри него. Единственный файл для игроков |
 
 После сборки CMake сам проверяет, что `tmnt2net.asi` — 32-битный файл (`tools/check_x86.cmake`).
 
@@ -98,16 +98,16 @@ cmake --build build --config Release
 |---|---|
 | `tmnt2net` | `tmnt2net.asi` и папку `build/dist/<конфигурация>` |
 | `tmnt2net_common` | общая библиотека: журнал, SHA-256, транспорты, лобби Steam, протокол |
-| `tmnt2net_setup` | `tmnt2net-setup.exe` |
-| `tmnt2net_launcher` | `tmnt2net-launcher.exe`: [лаунчер](LAUNCHER.md) |
+| `mod_payload` | файлы мода в `build/payload`, как они ложатся в лаунчер |
+| `tmnt2net_launcher` | `tmnt2net-launcher.exe`: [лаунчер](LAUNCHER.md) с модом внутри |
 | `minhook`, `enet` | сторонние библиотеки |
 
 ## Установка собранного мода
 
-Запустите собранный установщик или скопируйте файлы из `build/dist/Release` в папку игры. Из командной строки:
+Запустите собранный лаунчер или скопируйте файлы из `build/dist/Release` в папку игры. Из командной строки:
 
 ```bash
-build\dist\Release\tmnt2net-setup.exe /install "C:\Games\TMNT 2 - Battle Nexus" /quiet
+build\dist\Release\tmnt2net-launcher.exe /install "C:\Games\TMNT 2 - Battle Nexus" /quiet
 ```
 
 ## Шейдер обработки кадра
@@ -133,16 +133,20 @@ python tools/gen_postfx.py
 5. Собрать `Release` и сделать описание релиза для лаунчера:
 
    ```
-   python tools/release_manifest.py build/Release/tmnt2net-setup.exe build/Release/tmnt2net-launcher.exe build/Release/tmnt2net-latest.json
+   python tools/release_manifest.py build/Release/tmnt2net-launcher.exe build/Release/tmnt2net-latest.json
    ```
 
-6. Выложить в релиз три файла: `tmnt2net-setup.exe`, `tmnt2net-launcher.exe` и `tmnt2net-latest.json`.
-   Без последнего лаунчер узнает только номер версии и поставит мод без сверки контрольной суммы.
+6. Выложить в релиз два файла: `tmnt2net-launcher.exe` (мод внутри него) и `tmnt2net-latest.json`. Без
+   второго лаунчеры узнают только номер версии и поставят мод без сверки контрольной суммы.
 
 ## Лаунчер
 
 Собирается целью `tmnt2net_launcher`, ничего стороннего ему не нужно: Direct2D, DirectWrite и WinHTTP есть
-в Windows. Его версия — `kLauncherVersion` в `src/launcher/launcher.h`.
+в Windows. Его версия — `kLauncherVersion` в `src/launcher/launcher.h`; её нужно поднимать при каждом
+изменении лаунчера, иначе старые лаунчеры не заменят себя новым.
+
+- Файлы мода (`build/payload`), их список и `dist/release.json` встраиваются в exe как ресурсы. Версию мода и
+  протокол CMake берёт из `src/common/version.h` и `src/common/protocol.h`.
 
 - Шрифты лежат в `src/launcher/assets/fonts` и встраиваются в exe. Их делает `tools/launcher_fonts.py`
   (нужны `fontTools` и `brotli`) из файлов Google Fonts; лицензии — рядом. Шрифт заголовков, Dela Gothic

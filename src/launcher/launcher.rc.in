@@ -1,5 +1,8 @@
 #include "@CMAKE_SOURCE_DIR@/src/launcher/res.h"
 
+// (no language of their own: found whatever Windows speaks, and replaceable in tests)
+LANGUAGE 0, 0
+
 IDI_APP ICON "@CMAKE_SOURCE_DIR@/src/launcher/assets/launcher.ico"
 
 RES_FONT_ONEST_400 RCDATA "@LAUNCHER_FONTS@/Onest-Regular.ttf"
@@ -10,9 +13,18 @@ RES_FONT_MONO_500 RCDATA "@LAUNCHER_FONTS@/JetBrainsMono-Medium.ttf"
 RES_FONT_MONO_700 RCDATA "@LAUNCHER_FONTS@/JetBrainsMono-Bold.ttf"
 @LAUNCHER_DISPLAY_RC@
 
+// The mod inside (package.cpp): its description, the list of its files, the files.
+RES_PKG_INFO RCDATA "@CMAKE_SOURCE_DIR@/dist/release.json"
+RES_PKG_INDEX RCDATA "@CMAKE_BINARY_DIR@/package-index.txt"
+301 RCDATA "@PAYLOAD_DIR@/winmm.dll"
+302 RCDATA "@PAYLOAD_DIR@/tmnt2net.asi"
+@PKG_STEAM_RC@
+304 RCDATA "@PAYLOAD_DIR@/tmnt2net.ini"
+305 RCDATA "@PAYLOAD_DIR@/README.md"
+
 1 VERSIONINFO
-FILEVERSION 1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION @LAUNCHER_VERSION_COMMAS@,0
+PRODUCTVERSION @LAUNCHER_VERSION_COMMAS@,0
 FILEOS 0x40004L
 FILETYPE 0x1L
 BEGIN
@@ -20,10 +32,10 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "FileDescription", "tmnt2net launcher - TMNT 2: Battle Nexus online co-op mod"
+      VALUE "FileDescription", "tmnt2net - TMNT 2: Battle Nexus online co-op mod, its launcher and installer"
       VALUE "ProductName", "tmnt2net"
-      VALUE "FileVersion", "1.0.0"
-      VALUE "ProductVersion", "1.0.0"
+      VALUE "FileVersion", "@LAUNCHER_VERSION@"
+      VALUE "ProductVersion", "@LAUNCHER_VERSION@ (mod @MOD_VERSION@)"
       VALUE "OriginalFilename", "tmnt2net-launcher.exe"
       VALUE "LegalCopyright", "MIT License. Unofficial fan mod."
     END

@@ -1,7 +1,9 @@
-// tmnt2net-launcher.exe: what its parts share. The launcher finds the game, asks GitHub for the newest
-// release of the mod, downloads its installer, checks it, runs it and starts the game.
+// tmnt2net-launcher.exe: what its parts share. The launcher carries the mod inside itself: it finds the
+// game, puts the mod in, asks GitHub for a newer release (a newer launcher, with a newer mod inside), gets
+// it, checks it, installs from it, and starts the game.
 //   model: what is on the screen (main.cpp changes it, view.cpp draws it)
-//   core:  the game folder, the installed mod, settings, the release, the installer (core.cpp)
+//   core:  the game folder, the installed mod, settings, the release (core.cpp)
+//   pkg:   the mod inside a launcher file, putting it into the game folder and taking it out (package.cpp)
 //   net:   HTTP through WinHTTP, with or without a proxy (net.cpp)
 #pragma once
 #include <windows.h>
@@ -18,25 +20,25 @@
 namespace lz {
 
 constexpr int kW = 960, kH = 600;  // the window, in units of 1/96 inch
-constexpr wchar_t kLauncherVersion[] = L"1.0.0";
+constexpr wchar_t kLauncherVersion[] = L"1.1.0";
 constexpr wchar_t kRepoUrl[] = L"https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 constexpr wchar_t kRepoText[] = L"github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 
 enum class Screen { Checking, Update, Downloading, Ready, Install, NoGame, Offline, Running, Problem, Settings };
 
-// The newest release of the mod, by tmnt2net-latest.json of the release.
+// A release of the mod: the newest on GitHub (by its tmnt2net-latest.json), or the one inside this launcher.
 struct Release {
   bool known = false;   // the version is known
-  bool full = false;    // the whole description came (notes, the installer's size and checksum)
+  bool full = false;    // GitHub's whole description came (the launcher file's name, size and checksum)
   std::wstring version;
   int protocol = 0;
   std::wstring date;    // "20 ноября 2026"
   std::wstring title;
   std::vector<std::wstring> notes;
-  std::wstring setup_name;
-  uint64_t setup_size = 0;
-  std::string setup_sha256;
-  std::wstring launcher_version;  // the newest launcher
+  std::wstring pkg_name;          // the release's launcher file: the mod is inside it
+  uint64_t pkg_size = 0;
+  std::string pkg_sha256;
+  std::wstring launcher_version;  // that launcher's own version
   std::vector<std::pair<std::wstring, int>> protocols;  // version -> protocol
 };
 
@@ -59,15 +61,16 @@ struct Settings {
   std::vector<std::wstring> notes;
 };
 
-enum class Pending { None, Install, Uninstall };
-enum class Fix { None, Retry, OpenSetup, Back, Recheck };
+enum class Pending { None, Install, Uninstall, Launcher };
+enum class Fix { None, Retry, Back, Recheck };
 
 struct Model {
   Screen screen = Screen::Checking;
   Screen back = Screen::Ready;  // under the settings
   Settings set;
   Installed inst;
-  Release rel;
+  Release rel;   // what GitHub says
+  Release pack;  // what is inside this launcher
   bool has_game = false;
   bool exe_ok = true;           // TMNT2.exe is the one the mod works with
   bool unchecked = false;       // no answer asked of GitHub (the check at start is off)
@@ -84,6 +87,7 @@ struct Model {
   ULONGLONG flash_until = 0;
   // passing states of buttons
   bool launching = false, rechecking = false, confirm_uninstall = false;
+  bool swapped = false;  // a newer launcher is in this one's place: it opens at the next start
   ULONGLONG copied_until = 0;
   // the Problem screen
   std::wstring problem_title, problem_text, problem_primary, problem_secondary;
@@ -176,18 +180,54 @@ struct CheckResult {
 CheckResult check(const Settings& s, const std::atomic<bool>& cancel);
 bool parse_manifest(const std::string& json, Release& rel);
 
-enum class Step { Ok, Cancelled, NetFail, BadSum, SetupFail, Denied, NoSetup };
+// The mod inside this launcher (always there), and which version there is to install: GitHub's if it is
+// newer than the one inside and its file can be had, else the one inside.
+const Release& bundled();
+bool newer_on_github(const Release& rel, bool assets_blocked);
+const Release& target(const Release& rel, bool assets_blocked);
+
+enum class Step { Ok, Cancelled, NetFail, BadSum, BadPackage, Failed, Denied };
 struct UpdateHooks {
   std::function<void(int stage)> stage;
   std::function<void(uint64_t got, uint64_t total)> progress;
   std::function<void(bool waiting)> game_open;  // the game holds the mod's files: waiting for it to close
 };
-// Downloads the release's installer (unless it is there already), checks it and runs it.
-Step install(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
-             const std::atomic<bool>& cancel, int* exit_code, std::wstring* setup_path);
-Step uninstall(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
-               const std::atomic<bool>& cancel, int* exit_code);
-std::wstring cached_setup(const std::wstring& version);  // its path in the cache (may not exist)
+Step install(const Release& rel, bool download, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
+             const std::atomic<bool>& cancel, std::wstring* log, std::wstring* package_file);
+Step uninstall(const Settings& s, const UpdateHooks& hooks, const std::atomic<bool>& cancel, std::wstring* log);
+Step fetch_launcher(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
+                    const std::atomic<bool>& cancel, std::wstring* log, std::wstring* package_file);
+bool replace_self(const std::wstring& newer);
+void drop_old_self();
 }  // namespace core
+
+namespace pkg {
+struct Entry {
+  std::wstring name;
+  int id = 0;              // the resource with its bytes (0: `text`)
+  std::string text;
+  bool loader = false, keep = false, if_missing = false;
+};
+class Package {
+ public:
+  Package() = default;
+  ~Package();
+  Package(const Package&) = delete;
+  Package& operator=(const Package&) = delete;
+  bool open(const std::wstring& file);  // a launcher file, read as data; empty: this launcher itself
+  bool bytes(int id, const void*& data, DWORD& size) const;
+  std::wstring version, launcher_version;
+  int protocol = 0;
+  std::vector<Entry> entries;
+  std::string info;  // its release.json
+
+ private:
+  HMODULE mod_ = nullptr;
+  bool owned_ = false;
+};
+enum class Result { Ok, Failed, Denied };
+Result install(const Package& p, const std::wstring& dir, std::wstring& log);
+Result uninstall(const std::wstring& dir, std::wstring& log);
+}  // namespace pkg
 
 }  // namespace lz

@@ -163,18 +163,15 @@ Everything is set up inside the game, in its own font and style.
 
 <img src="docs/images/launcher-update.png" alt="The launcher: a new version of the mod is out" width="400" align="right">
 
-1. Download `tmnt2net-launcher.exe` from [Releases](../../releases/latest) and run it.
-2. The launcher finds the game, downloads the newest version of the mod, checks it and installs it. From
-   then on it offers updates and starts the game. Its interface is in Russian; details are on the
-   [launcher page](docs/LAUNCHER.md).
+1. Download `tmnt2net-launcher.exe` from [Releases](../../releases/latest) and run it. It is the only
+   file: the mod is inside it.
+2. The launcher finds the game and installs the mod. From then on it offers updates and starts the game.
+   Its interface is in Russian; details are on the [launcher page](docs/LAUNCHER.md).
 3. Press the green button (**ИГРАТЬ**, play). The mod's version appears under the title menu, along with
    two new items: network play (**СЕТЕВАЯ ИГРА**) and mod settings (**НАСТРОЙКИ МОДА**).
 
-Without the launcher: download `tmnt2net-setup.exe` from the same page, run it and choose to install or
-update the mod.
-
-> Neither the launcher nor the installer is signed with a certificate, so Windows may show "Windows
-> protected your PC". Click "More info" → "Run anyway".
+> The launcher is not signed with a certificate, so Windows may show "Windows protected your PC". Click
+> "More info" → "Run anyway".
 
 <br clear="right">
 
@@ -233,7 +230,7 @@ The detailed pages are in Russian.
 | [Settings](docs/SETTINGS.md) | the in-game settings pages and the `tmnt2net.ini` reference |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | common questions and what to attach to a bug report |
 | [Changelog](docs/CHANGELOG.md) | what changed from version to version, network compatibility |
-| [Building](docs/BUILDING.md) | building the mod, the installer and the launcher from source |
+| [Building](docs/BUILDING.md) | building the mod and the launcher from source |
 | [Architecture](docs/ARCHITECTURE.md) | how network play works, modules, protocol |
 | [Reverse-engineering notes](re/notes.md) | addresses, structures and evidence for `TMNT2.exe` (in English) |
 

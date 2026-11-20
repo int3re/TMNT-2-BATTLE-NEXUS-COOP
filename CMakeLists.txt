@@ -154,19 +154,22 @@ else()
   message(WARNING "Ultimate ASI Loader not found at ${UAL_DLL}: dist has no winmm.dll")
 endif()
 
-# --- tmnt2net-setup.exe: one-file installer / uninstaller with everything inside ---
+# --- the mod's files as the launcher carries them (build/payload) ----------------------------------------
 if(EXISTS ${UAL_DLL})
   set(PAYLOAD_DIR ${CMAKE_BINARY_DIR}/payload)
   set(PAYLOAD_FILES ${PAYLOAD_DIR}/winmm.dll ${PAYLOAD_DIR}/tmnt2net.asi ${PAYLOAD_DIR}/tmnt2net.ini
                     ${PAYLOAD_DIR}/README.md)
-  set(PAYLOAD_STEAM_RC "")
+  set(PKG_STEAM_RC "")
+  set(PKG_STEAM_INDEX "")
   set(PAYLOAD_STEAM_COPY "")
   if(TMNT2NET_STEAM)
     list(APPEND PAYLOAD_FILES ${PAYLOAD_DIR}/steam_api.dll)
-    set(PAYLOAD_STEAM_RC "RES_STEAM RCDATA \"${PAYLOAD_DIR}/steam_api.dll\"")
+    set(PKG_STEAM_RC "303 RCDATA \"${PAYLOAD_DIR}/steam_api.dll\"")
+    # (Steam knows tmnt2net as Valve's test app Spacewar)
+    set(PKG_STEAM_INDEX "file steam_api.dll 303\ntext steam_appid.txt 480 ifmissing\n")
     set(PAYLOAD_STEAM_COPY COMMAND ${CMAKE_COMMAND} -E copy_if_different ${STEAM_API_DLL} ${PAYLOAD_DIR}/)
   endif()
-  add_custom_target(setup_payload
+  add_custom_target(mod_payload
     COMMAND ${CMAKE_COMMAND} -E make_directory ${PAYLOAD_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${UAL_DLL} ${PAYLOAD_DIR}/winmm.dll
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:tmnt2net> ${PAYLOAD_DIR}/
@@ -174,53 +177,75 @@ if(EXISTS ${UAL_DLL})
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/dist/README.md ${PAYLOAD_DIR}/
     ${PAYLOAD_STEAM_COPY}
     BYPRODUCTS ${PAYLOAD_FILES})
-  add_dependencies(setup_payload tmnt2net)
-  configure_file(src/setup/payload.rc.in ${CMAKE_BINARY_DIR}/payload.rc @ONLY)
-  set_source_files_properties(${CMAKE_BINARY_DIR}/payload.rc PROPERTIES OBJECT_DEPENDS "${PAYLOAD_FILES}")
-  add_executable(tmnt2net_setup WIN32 src/setup/setup.cpp src/common/sha256.cpp ${CMAKE_BINARY_DIR}/payload.rc)
-  target_include_directories(tmnt2net_setup PRIVATE src)
-  target_compile_definitions(tmnt2net_setup PRIVATE ${OUR_DEFS})
-  target_compile_options(tmnt2net_setup PRIVATE ${OUR_OPTS})
-  target_link_libraries(tmnt2net_setup PRIVATE comctl32 ole32 shell32 advapi32 bcrypt)
-  target_link_options(tmnt2net_setup PRIVATE
-    "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'")
-  set_target_properties(tmnt2net_setup PROPERTIES OUTPUT_NAME "tmnt2net-setup")
-  add_dependencies(tmnt2net_setup setup_payload)
-  add_custom_command(TARGET tmnt2net_setup POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:tmnt2net_setup> ${CMAKE_BINARY_DIR}/dist/$<CONFIG>/)
+  add_dependencies(mod_payload tmnt2net)
 endif()
 
-# --- tmnt2net-launcher.exe: finds the game, asks GitHub for the newest release, installs it, starts the game ---
-# Direct2D + DirectWrite + WinHTTP: nothing but Windows. The fonts are in the exe (src/launcher/assets/fonts,
+# --- tmnt2net-launcher.exe: the one file a player gets -------------------------------------------------------
+# It carries the mod inside (the files above, as resources): finds the game, puts the mod in and takes it out,
+# asks GitHub for a newer release - a newer launcher with a newer mod inside - and starts the game.
+# Direct2D + DirectWrite + WinHTTP: nothing but Windows. The fonts are in the exe too (src/launcher/assets/fonts,
 # made by tools/launcher_fonts.py); without the file of the headings' font, Dela Gothic One, a system font stands in.
-set(LAUNCHER_FONTS ${CMAKE_SOURCE_DIR}/src/launcher/assets/fonts)
-set(LAUNCHER_FONT_FILES ${LAUNCHER_FONTS}/Onest-Regular.ttf ${LAUNCHER_FONTS}/Onest-Medium.ttf ${LAUNCHER_FONTS}/Onest-SemiBold.ttf
-                        ${LAUNCHER_FONTS}/Onest-Bold.ttf ${LAUNCHER_FONTS}/JetBrainsMono-Medium.ttf
-                        ${LAUNCHER_FONTS}/JetBrainsMono-Bold.ttf)
-set(LAUNCHER_DISPLAY_RC "")
-if(EXISTS ${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf)
-  set(LAUNCHER_DISPLAY_RC "RES_FONT_DISPLAY RCDATA \"${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf\"")
-  list(APPEND LAUNCHER_FONT_FILES ${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf)
+if(EXISTS ${UAL_DLL})
+  set(LAUNCHER_FONTS ${CMAKE_SOURCE_DIR}/src/launcher/assets/fonts)
+  set(LAUNCHER_FONT_FILES ${LAUNCHER_FONTS}/Onest-Regular.ttf ${LAUNCHER_FONTS}/Onest-Medium.ttf ${LAUNCHER_FONTS}/Onest-SemiBold.ttf
+                          ${LAUNCHER_FONTS}/Onest-Bold.ttf ${LAUNCHER_FONTS}/JetBrainsMono-Medium.ttf
+                          ${LAUNCHER_FONTS}/JetBrainsMono-Bold.ttf)
+  set(LAUNCHER_DISPLAY_RC "")
+  if(EXISTS ${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf)
+    set(LAUNCHER_DISPLAY_RC "RES_FONT_DISPLAY RCDATA \"${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf\"")
+    list(APPEND LAUNCHER_FONT_FILES ${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf)
+  else()
+    message(STATUS "Launcher: no DelaGothicOne-Regular.ttf in ${LAUNCHER_FONTS}: headings in a system font")
+  endif()
+
+  # What the package inside says of itself: the mod's version and protocol, the launcher's own version.
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    src/common/version.h src/common/protocol.h src/launcher/launcher.h dist/release.json)
+  file(STRINGS src/common/version.h _line REGEX "define TMNT2NET_VERSION \"")
+  string(REGEX REPLACE ".*\"([0-9.]+)\".*" "\\1" MOD_VERSION "${_line}")
+  file(STRINGS src/common/protocol.h _line REGEX "kVersion = [0-9]+")
+  string(REGEX REPLACE ".*kVersion = ([0-9]+).*" "\\1" MOD_PROTOCOL "${_line}")
+  file(STRINGS src/launcher/launcher.h _line REGEX "kLauncherVersion.. = L\"")
+  string(REGEX REPLACE ".*L\"([0-9.]+)\".*" "\\1" LAUNCHER_VERSION "${_line}")
+  string(REPLACE "." "," LAUNCHER_VERSION_COMMAS "${LAUNCHER_VERSION}")
+  file(READ dist/release.json _notes)
+  if(NOT _notes MATCHES "\"version\": *\"${MOD_VERSION}\"")
+    message(WARNING "dist/release.json is not for ${MOD_VERSION}: the launcher will show no notes for the mod inside")
+  endif()
+  message(STATUS "Launcher ${LAUNCHER_VERSION} with the mod ${MOD_VERSION} (protocol ${MOD_PROTOCOL}) inside")
+  file(CONFIGURE OUTPUT ${CMAKE_BINARY_DIR}/package-index.txt CONTENT
+"tmnt2net-package 1
+version ${MOD_VERSION}
+protocol ${MOD_PROTOCOL}
+launcher ${LAUNCHER_VERSION}
+file winmm.dll 301 loader
+file tmnt2net.asi 302
+${PKG_STEAM_INDEX}file tmnt2net.ini 304 keep
+file tmnt2net-README.md 305
+" @ONLY NEWLINE_STYLE LF)
+
+  configure_file(src/launcher/launcher.rc.in ${CMAKE_BINARY_DIR}/launcher.rc @ONLY)
+  set_source_files_properties(${CMAKE_BINARY_DIR}/launcher.rc PROPERTIES OBJECT_DEPENDS
+    "${LAUNCHER_FONT_FILES};${CMAKE_SOURCE_DIR}/src/launcher/assets/launcher.ico;${PAYLOAD_FILES};${CMAKE_BINARY_DIR}/package-index.txt;${CMAKE_SOURCE_DIR}/dist/release.json")
+  add_executable(tmnt2net_launcher WIN32
+    src/launcher/main.cpp
+    src/launcher/view.cpp
+    src/launcher/gfx.cpp
+    src/launcher/core.cpp
+    src/launcher/package.cpp
+    src/launcher/net.cpp
+    src/common/sha256.cpp
+    src/launcher/launcher.manifest
+    ${CMAKE_BINARY_DIR}/launcher.rc)
+  target_include_directories(tmnt2net_launcher PRIVATE src)
+  target_compile_definitions(tmnt2net_launcher PRIVATE ${OUR_DEFS})
+  target_compile_options(tmnt2net_launcher PRIVATE ${OUR_OPTS})
+  target_link_libraries(tmnt2net_launcher PRIVATE d2d1 dwrite windowscodecs winhttp ws2_32 dwmapi ole32 shell32 advapi32 bcrypt)
+  set_target_properties(tmnt2net_launcher PROPERTIES OUTPUT_NAME "tmnt2net-launcher")
+  add_dependencies(tmnt2net_launcher mod_payload)
+  add_custom_command(TARGET tmnt2net_launcher POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/$<CONFIG>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:tmnt2net_launcher> ${CMAKE_BINARY_DIR}/dist/$<CONFIG>/)
 else()
-  message(STATUS "Launcher: no DelaGothicOne-Regular.ttf in ${LAUNCHER_FONTS}: headings in a system font")
+  message(WARNING "No Ultimate ASI Loader: the launcher is not built")
 endif()
-configure_file(src/launcher/launcher.rc.in ${CMAKE_BINARY_DIR}/launcher.rc @ONLY)
-set_source_files_properties(${CMAKE_BINARY_DIR}/launcher.rc PROPERTIES OBJECT_DEPENDS
-                            "${LAUNCHER_FONT_FILES};${CMAKE_SOURCE_DIR}/src/launcher/assets/launcher.ico")
-add_executable(tmnt2net_launcher WIN32
-  src/launcher/main.cpp
-  src/launcher/view.cpp
-  src/launcher/gfx.cpp
-  src/launcher/core.cpp
-  src/launcher/net.cpp
-  src/common/sha256.cpp
-  src/launcher/launcher.manifest
-  ${CMAKE_BINARY_DIR}/launcher.rc)
-target_include_directories(tmnt2net_launcher PRIVATE src)
-target_compile_definitions(tmnt2net_launcher PRIVATE ${OUR_DEFS})
-target_compile_options(tmnt2net_launcher PRIVATE ${OUR_OPTS})
-target_link_libraries(tmnt2net_launcher PRIVATE d2d1 dwrite windowscodecs winhttp ws2_32 dwmapi ole32 shell32 advapi32 bcrypt)
-set_target_properties(tmnt2net_launcher PROPERTIES OUTPUT_NAME "tmnt2net-launcher")
-add_custom_command(TARGET tmnt2net_launcher POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/$<CONFIG>
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:tmnt2net_launcher> ${CMAKE_BINARY_DIR}/dist/$<CONFIG>/)

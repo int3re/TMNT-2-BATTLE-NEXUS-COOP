@@ -1,5 +1,8 @@
 // tmnt2net-launcher.exe: the window, the pointer and the keys, what each press does, the work in the
 // background (asking GitHub, downloading, installing), and the modes without a window:
+//   /install <game folder> [/quiet] [/package <launcher file>]  puts the mod in (from this launcher, or from
+//                                                               another one's inside), exit code 0 or 2
+//   /uninstall <game folder> [/quiet]                           takes it out
 //   --shot <screen> <file.png> [--scale N] [--accent 0..3]   a screen of the design as a picture
 //   --check [--out file]                                     ask for the newest release, write what came
 //   --where [--out file]                                     where the game is found from here
@@ -13,6 +16,7 @@
 #include <windowsx.h>
 
 #include <cstdio>
+#include <cwctype>
 #include <memory>
 #include <thread>
 
@@ -35,7 +39,6 @@ std::atomic<int> g_gen{0};       // checks: only the newest one's answer counts
 bool g_job = false;              // a download / install / removal runs
 bool g_startup_check = false;    // the check of the start (it may install by itself)
 net::Route g_route;              // the way to GitHub that worked last
-std::wstring g_setup_path;       // the installer of the last try
 Pending g_last_job = Pending::None;
 ULONGLONG g_start = 0, g_confirm_until = 0, g_launch_until = 0, g_quit_at = 0;
 bool g_tracking = false, g_dirty = true;
@@ -97,13 +100,16 @@ void refresh_installed() {
   if (g.inst.present && !g.inst.protocol) g.inst.protocol = core::known_protocol(g.rel, g.inst.version);
 }
 
+// What there is to install: GitHub's version if it is newer than the one inside this launcher (and its
+// file can be had), else the one inside.
+const Release& offer() { return core::target(g.rel, g.assets_blocked); }
+
 Screen decide() {
   if (!g.has_game) return Screen::NoGame;
-  if (!g.rel.known) return g.unchecked && g.inst.present ? Screen::Ready : Screen::Offline;
-  if (g.assets_blocked) return Screen::Offline;
   if (!g.inst.present) return Screen::Install;
-  if (g.inst.version.empty() || core::compare_versions(g.rel.version, g.inst.version) > 0) return Screen::Update;
-  return Screen::Ready;
+  if (g.inst.version.empty() || core::compare_versions(offer().version, g.inst.version) > 0) return Screen::Update;
+  if ((g.rel.known && !g.assets_blocked) || g.unchecked) return Screen::Ready;
+  return Screen::Offline;  // (nothing newer inside, and GitHub did not say)
 }
 
 void go_decided() {
@@ -136,33 +142,36 @@ void start_check(bool quiet) {
 
 struct Done {
   core::Step step;
-  int code;
-  std::wstring setup;
   Pending kind;
+  std::wstring log;      // what the install or the removal said, line by line
+  std::wstring package;  // the newer launcher file it came from (empty: this launcher)
+  Release rel;           // what was being installed
 };
 
 void start_job(Pending kind) {
   if (g_job) return;
-  if (kind == Pending::Install && (!g.rel.known || g.assets_blocked)) {
-    flash(L"Сначала нужен ответ GitHub: проверяю связь");
-    start_check(false);
+  Release rel = kind == Pending::Launcher ? g.rel : offer();
+  bool download = kind == Pending::Launcher || (kind == Pending::Install && core::newer_on_github(g.rel, g.assets_blocked));
+  if (kind == Pending::Install && !rel.known) {
+    flash(L"В этом лаунчере нет мода: скачайте лаунчер заново");
     return;
   }
   g_job = true;
   g_last_job = kind;
   g_cancel = false;
   g.pending = kind;
-  g.stage = kind == Pending::Uninstall ? 2 : 0;
+  g.stage = kind == Pending::Uninstall ? 2 : download ? 0 : 1;
   g.got = 0;
-  g.total = g.rel.setup_size;
+  g.total = download ? rel.pkg_size : 0;
   g.confirm_uninstall = false;
   set_screen(Screen::Downloading);
-  logf(kind == Pending::Uninstall ? L"job: uninstall" : L"job: install " + g.rel.version);
-  Release rel = g.rel;
+  logf(kind == Pending::Uninstall ? std::wstring(L"job: uninstall")
+       : kind == Pending::Launcher ? L"job: a newer launcher, " + rel.launcher_version
+       : L"job: install " + rel.version + (download ? L" from GitHub" : L" from this launcher"));
   Settings s = g.set;
   net::Route route = g_route;
   HWND hwnd = g_hwnd;
-  std::thread([rel, s, route, hwnd, kind]() {
+  std::thread([rel, download, s, route, hwnd, kind]() {
     core::UpdateHooks hooks;
     hooks.stage = [hwnd](int stage) { PostMessageW(hwnd, WM_APP_STAGE, static_cast<WPARAM>(stage), 0); };
     hooks.progress = [hwnd](uint64_t got, uint64_t total) {
@@ -174,9 +183,10 @@ void start_job(Pending kind) {
       }
     };
     hooks.game_open = [hwnd](bool waiting) { PostMessageW(hwnd, WM_APP_GAME, waiting ? 1 : 0, 0); };
-    auto* d = new Done{core::Step::Ok, 0, L"", kind};
-    if (kind == Pending::Uninstall) d->step = core::uninstall(rel, s, route, hooks, g_cancel, &d->code);
-    else d->step = core::install(rel, s, route, hooks, g_cancel, &d->code, &d->setup);
+    auto* d = new Done{core::Step::Ok, kind, L"", L"", rel};
+    if (kind == Pending::Uninstall) d->step = core::uninstall(s, hooks, g_cancel, &d->log);
+    else if (kind == Pending::Launcher) d->step = core::fetch_launcher(rel, s, route, hooks, g_cancel, &d->log, &d->package);
+    else d->step = core::install(rel, download, s, route, hooks, g_cancel, &d->log, &d->package);
     if (!PostMessageW(hwnd, WM_APP_DONE, 0, reinterpret_cast<LPARAM>(d))) delete d;
   }).detach();
 }
@@ -192,24 +202,65 @@ void problem(const wchar_t* title, const std::wstring& text, const wchar_t* prim
   logf(std::wstring(L"problem: ") + title);
 }
 
+// The line of a log that says what went wrong: the last one that begins "не удалось" or has an error in it.
+std::wstring reason(const std::wstring& log) {
+  std::wstring last, why;
+  for (size_t p = 0; p < log.size();) {
+    size_t e = log.find(L'\n', p);
+    if (e == std::wstring::npos) e = log.size();
+    std::wstring line = log.substr(p, e - p);
+    if (!line.empty()) last = line;
+    if (line.rfind(L"не удалось", 0) == 0 || line.find(L"не уда") != std::wstring::npos || line.find(L"нет ") != std::wstring::npos ||
+        line.find(L"запущена") != std::wstring::npos)
+      why = line;
+    p = e + 1;
+  }
+  std::wstring out = why.empty() ? last : why;
+  if (!out.empty()) out[0] = static_cast<wchar_t>(towupper(out[0]));
+  return out.empty() ? L"Причина не названа" : out;
+}
+
+// A newer launcher file is at hand (downloaded and checked): it takes this one's place.
+void take_newer_launcher(const std::wstring& file, bool say) {
+  pkg::Package p;
+  if (file.empty() || !p.open(file) || core::compare_versions(p.launcher_version, kLauncherVersion) <= 0) return;
+  if (core::replace_self(file)) {
+    g.swapped = true;
+    logf(L"launcher replaced by " + p.launcher_version);
+    if (say) flash(L"Лаунчер обновлён до " + p.launcher_version + L": новая версия откроется при следующем запуске", 7000);
+  } else {
+    logf(L"launcher NOT replaced");
+    if (say) flash(L"Лаунчер не смог заменить свой файл: скачайте новый со страницы релиза", 7000);
+  }
+}
+
 void on_done(Done* d) {
   g_job = false;
   g.pending = Pending::None;
-  g_setup_path = d->setup;
-  logf(L"job done: step " + std::to_wstring(static_cast<int>(d->step)) + L", exit code " + std::to_wstring(d->code));
+  logf(L"job done: step " + std::to_wstring(static_cast<int>(d->step)));
+  for (size_t p = 0; p < d->log.size();) {
+    size_t e = d->log.find(L'\n', p);
+    if (e == std::wstring::npos) e = d->log.size();
+    if (e > p) logf(L"  " + d->log.substr(p, e - p));
+    p = e + 1;
+  }
   switch (d->step) {
     case core::Step::Ok:
       refresh_installed();
       if (d->kind == Pending::Install) {
-        if (g.rel.full) {  // the notes of what is installed now, for the days GitHub does not answer
-          g.set.notes_version = g.rel.version;
-          g.set.notes_title = g.rel.title;
-          g.set.notes_date = g.rel.date;
-          g.set.notes = g.rel.notes;
+        if (!d->rel.notes.empty()) {  // the notes of what is installed now
+          g.set.notes_version = d->rel.version;
+          g.set.notes_title = d->rel.title;
+          g.set.notes_date = d->rel.date;
+          g.set.notes = d->rel.notes;
           core::save_settings(g.set);
         }
         go_decided();
         flash(L"Мод установлен: версия " + g.inst.version);
+        take_newer_launcher(d->package, false);
+      } else if (d->kind == Pending::Launcher) {
+        go_decided();
+        take_newer_launcher(d->package, true);
       } else {
         go_decided();
         flash(L"Мод удалён из папки игры");
@@ -228,21 +279,18 @@ void on_done(Done* d) {
               L"Контрольная сумма скачанного файла не совпала с той, что указана в релизе. Файл удалён — скачайте его ещё раз.",
               L"СКАЧАТЬ ЗАНОВО", Fix::Retry);
       break;
-    case core::Step::Denied:
-      problem(L"Нужно разрешение Windows",
-              L"Игра лежит в папке, куда обычной программе писать нельзя. Windows спросит разрешение — без него мод не поставить.",
+    case core::Step::BadPackage:
+      problem(L"В релизе не тот файл", reason(d->log) + L". Попробуйте позже или скачайте лаунчер со страницы релиза.",
               L"ПОВТОРИТЬ", Fix::Retry);
       break;
-    case core::Step::NoSetup:
-      problem(L"Нет установщика",
-              L"Мод убирает его же установщик, а его нет на этом ПК, и GitHub не отвечает. Проверьте связь и повторите.",
-              L"ПРОВЕРИТЬ СВЯЗЬ", Fix::Recheck);
+    case core::Step::Denied:
+      problem(L"Нужно разрешение Windows",
+              L"Игра лежит в папке, куда обычной программе писать нельзя. Windows спросит разрешение — без него мод не поставить и не убрать.",
+              L"ПОВТОРИТЬ", Fix::Retry);
       break;
     default:
-      problem(d->kind == Pending::Uninstall ? L"Удаление не удалось" : L"Установка не удалась",
-              L"Установщик завершился с ошибкой (код " + std::to_wstring(d->code) +
-                  L"). Откройте его сами: он покажет, что помешало.",
-              L"ОТКРЫТЬ УСТАНОВЩИК", Fix::OpenSetup);
+      problem(d->kind == Pending::Uninstall ? L"Удаление не удалось" : L"Установка не удалась", reason(d->log) + L".", L"ПОВТОРИТЬ",
+              Fix::Retry);
       break;
   }
   delete d;
@@ -269,7 +317,7 @@ void on_check(int gen, core::CheckResult* r) {
   GetLocalTime(&t);
   wchar_t at[16];
   swprintf(at, 16, L"%02d:%02d", t.wHour, t.wMinute);
-  g.checked_at = at;
+  g.checked_at = r->rel.known ? at : L"";
   g.via = r->rel.known && r->route.kind == 2 ? r->route.label : L"";
   refresh_installed();
   bool startup = g_startup_check;
@@ -325,8 +373,8 @@ void choose_folder() {
   g.set.game_dir = core::trimmed(dir);
   core::save_settings(g.set);
   refresh_installed();
-  if (g.rel.known) go_decided();
-  else start_check(false);
+  go_decided();
+  if (!g.rel.known && !g.rechecking) start_check(true);
 }
 
 std::wstring newest_desync_log(const std::wstring& dir) {
@@ -349,17 +397,6 @@ void fix(Fix f) {
   switch (f) {
     case Fix::Retry:
       start_job(g_last_job == Pending::None ? Pending::Install : g_last_job);
-      break;
-    case Fix::OpenSetup:
-      if (!g_setup_path.empty() && core::exists(g_setup_path)) {
-        logf(L"the installer opened by hand");
-        if (!g_drive) {
-          std::wstring args = L"\"" + g.set.game_dir + L"\"";
-          ShellExecuteW(g_hwnd, L"open", g_setup_path.c_str(), args.c_str(), nullptr, SW_SHOWNORMAL);
-        }
-      } else {
-        open_url(std::wstring(kRepoUrl) + L"/releases/latest");
-      }
       break;
     case Fix::Recheck:
       start_check(false);
@@ -446,7 +483,8 @@ void act(int id) {
       open_url(kRepoUrl);
       break;
     case H_NewLauncher:
-      open_url(std::wstring(kRepoUrl) + L"/releases/latest");
+      if (g.rel.full && !g_job && !g.swapped) start_job(Pending::Launcher);
+      else if (!g.swapped) open_url(std::wstring(kRepoUrl) + L"/releases/latest");
       break;
     case H_Toggle1:
       g.set.auto_check = !g.set.auto_check;
@@ -808,6 +846,40 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
   return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+// The mod put into a game folder or taken out of it with no window of the launcher: for scripts, for
+// this launcher asking Windows for administrator rights, and for launcher 1.0.0, which runs what it
+// downloads as an installer. quiet: the report goes to the console the launcher was started from, if
+// there is one; else it is shown in a box.
+int headless(int verb, const std::wstring& dir, bool quiet, const std::wstring& package) {
+  std::wstring log;
+  pkg::Result r = pkg::Result::Failed;
+  if (dir.empty()) {
+    log = L"не указана папка игры\n";
+  } else if (verb == 1) {
+    pkg::Package p;
+    if (p.open(package)) {
+      r = pkg::install(p, dir, log);
+      if (r == pkg::Result::Ok) log = L"Мод tmnt2net " + p.version + L" установлен в:\n" + dir + L"\n\n" + log;
+    } else {
+      log = package.empty() ? L"в этом лаунчере нет мода\n" : L"в файле " + package + L" нет мода\n";
+    }
+  } else {
+    r = pkg::uninstall(dir, log);
+    if (r == pkg::Result::Ok) log = L"Мод tmnt2net удалён из:\n" + dir + L"\n\n" + log;
+  }
+  if (r != pkg::Result::Ok) log = L"Не получилось.\n\n" + log;
+  if (!quiet) {
+    MessageBoxW(nullptr, log.c_str(), L"tmnt2net", MB_OK | (r == pkg::Result::Ok ? MB_ICONINFORMATION : MB_ICONERROR));
+  } else if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+    HANDLE out = GetStdHandle(r == pkg::Result::Ok ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
+    DWORD n = 0;
+    std::wstring text = L"\n" + log;
+    if (out && out != INVALID_HANDLE_VALUE) WriteConsoleW(out, text.c_str(), static_cast<DWORD>(text.size()), &n, nullptr);
+  }
+  if (!g_out.empty()) logf(log);
+  return r == pkg::Result::Ok ? 0 : 2;
+}
+
 std::vector<std::wstring> split(const std::wstring& s, wchar_t sep) {
   std::vector<std::wstring> out;
   size_t p = 0;
@@ -824,7 +896,9 @@ int run(int argc, wchar_t** argv) {
   std::wstring shot_screen, shot_file;
   float shot_scale = 1;
   int accent = -1;
-  bool check_only = false, where_only = false;
+  bool check_only = false, where_only = false, quiet = false;
+  int verb = 0;  // 1 /install, 2 /uninstall
+  std::wstring verb_dir, package;
   for (int i = 1; i < argc; ++i) {
     std::wstring a = argv[i];
     auto next = [&]() { return i + 1 < argc ? std::wstring(argv[++i]) : std::wstring(); };
@@ -835,6 +909,14 @@ int run(int argc, wchar_t** argv) {
       shot_scale = static_cast<float>(_wtof(next().c_str()));
     } else if (a == L"--accent") {
       accent = _wtoi(next().c_str()) & 3;
+    } else if (a == L"/install" || a == L"/uninstall") {
+      verb = a == L"/install" ? 1 : 2;
+    } else if (a == L"/quiet") {
+      quiet = true;
+    } else if (a == L"/package") {
+      package = next();
+    } else if (verb && verb_dir.empty() && !a.empty() && a[0] != L'-' && a[0] != L'/') {
+      verb_dir = a;
     } else if (a == L"--check") {
       check_only = true;
     } else if (a == L"--where") {
@@ -855,6 +937,7 @@ int run(int argc, wchar_t** argv) {
     }
   }
   g_start = GetTickCount64();
+  if (verb) return headless(verb, core::trimmed(verb_dir), quiet, package);
   if (!gfx::init()) {
     MessageBoxW(nullptr, L"Не удалось включить Direct2D: лаунчеру нужна Windows 10 или новее.", L"tmnt2net", MB_ICONERROR);
     return 3;
@@ -890,9 +973,10 @@ int run(int argc, wchar_t** argv) {
     logf(std::wstring(L"known ") + (r.rel.known ? L"1" : L"0") + L" full " + (r.rel.full ? L"1" : L"0") + L" blocked " +
          (r.assets_blocked ? L"1" : L"0") + L" version " + r.rel.version + L" protocol " + std::to_wstring(r.rel.protocol) +
          L" route " + r.route.label);
-    logf(L"date " + r.rel.date + L" title " + r.rel.title + L" notes " + std::to_wstring(r.rel.notes.size()) + L" setup " +
-         r.rel.setup_name + L" " + std::to_wstring(r.rel.setup_size) + L" " + core::wide(r.rel.setup_sha256) + L" launcher " +
+    logf(L"date " + r.rel.date + L" title " + r.rel.title + L" notes " + std::to_wstring(r.rel.notes.size()) + L" file " +
+         r.rel.pkg_name + L" " + std::to_wstring(r.rel.pkg_size) + L" " + core::wide(r.rel.pkg_sha256) + L" launcher " +
          r.rel.launcher_version);
+    logf(L"inside this launcher: mod " + core::bundled().version + L", protocol " + std::to_wstring(core::bundled().protocol));
     logf(r.log);
     gfx::shutdown();
     return r.rel.known ? 0 : 1;
@@ -950,20 +1034,26 @@ int run(int argc, wchar_t** argv) {
       core::save_settings(g.set);
     }
   }
+  g.pack = core::bundled();
+  core::drop_old_self();  // (what an update of the launcher itself left behind)
   refresh_installed();
   logf(std::wstring(L"start: game ") + (g.has_game ? L"found" : L"not found") + L", mod " +
-       (g.inst.present ? (g.inst.version.empty() ? L"of an unknown version" : g.inst.version) : L"not installed"));
+       (g.inst.present ? (g.inst.version.empty() ? L"of an unknown version" : g.inst.version) : L"not installed") +
+       L"; inside the launcher: " + (g.pack.known ? g.pack.version : L"NOTHING"));
   if (!g.has_game) {
     g.screen = Screen::NoGame;
-    start_check(true);  // (the newest version is shown meanwhile)
-    g.rechecking = false;
-  } else if (g.set.auto_check || !g.inst.present) {
+    start_check(true);  // (the newest version is known by the time a folder is picked)
+  } else if (!g.inst.present) {
+    g.screen = Screen::Install;  // (the mod is inside: it can go in at once; GitHub may still name a newer one)
+    g_startup_check = true;
+    start_check(true);
+  } else if (g.set.auto_check) {
     g.screen = Screen::Checking;
     g_startup_check = true;
     start_check(false);
   } else {
     g.unchecked = true;
-    g.screen = Screen::Ready;
+    g.screen = decide();
   }
 
   SetTimer(g_hwnd, 1, 33, nullptr);
