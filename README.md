@@ -12,7 +12,7 @@
   <img alt="1–4 игрока" src="https://img.shields.io/badge/игроков-1–4-f59e0b">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/сеть-Steam%20·%20LAN%20·%20IP-1b2838">
   <img alt="лицензия MIT" src="https://img.shields.io/badge/лицензия-MIT-lightgrey">
-  <img alt="скачиваний" src="https://img.shields.io/github/downloads/int3re/TMNT-2-BATTLE-NEXUS-COOP/total?color=5B3FD0&label=скачиваний">
+  <img alt="скачиваний" src="https://img.shields.io/github/downloads/int3re/TMNT-2-BATTLE-NEXUS-COOP/total?color=5B3FD0&label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9">
 </p>
 
 <p align="center">
