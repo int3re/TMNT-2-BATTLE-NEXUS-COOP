@@ -604,7 +604,7 @@ void downloading(Ctx& x, float top) {
   const float left = 40, right = 580;
   // the three steps
   const wchar_t* labels[3] = {L"Загрузка", L"Проверка", m.pending == Pending::Uninstall ? L"Удаление"
-                                                        : m.pending == Pending::Launcher ? L"Замена лаунчера" : L"Установка"};
+                                                        : m.pending == Pending::Launcher ? L"Перезапуск" : L"Установка"};
   float sx = left;
   Font lab = T(12, 600);
   for (int i = 0; i < 3; ++i) {
@@ -684,9 +684,10 @@ void downloading(Ctx& x, float top) {
   note.wrap = true;
   note.max_w = right - left;
   note.line_h = 12 * 1.45f;
-  c.text(m.pending == Pending::Uninstall ? L"Файлы игры, её сохранения и настройки остаются на месте."
-         : m.pending == Pending::Launcher ? L"Новый лаунчер откроется при следующем запуске. Мод в игре не меняется."
-                                          : L"Перед установкой лаунчер попросит закрыть игру. Настройки и сохранения остаются.",
+  c.text(m.pending == Pending::Uninstall ? std::wstring(L"Файлы игры, её сохранения и настройки остаются на месте.")
+         : m.pending == Pending::Launcher ? L"На GitHub вышла версия лаунчера " + m.rel.launcher_version +
+                                                L": лаунчер обновляет себя и перезапустится сам. Мод в папке игры при этом не меняется."
+                                          : std::wstring(L"Перед установкой лаунчер попросит закрыть игру. Настройки и сохранения остаются."),
          T(12), left, y, MUTED, note);
 }
 
@@ -970,28 +971,22 @@ void page_launcher(Ctx& x, float left, float top) {
   const float cw = col_w - 4 - 32;
   Font tiny = T(12);
   float h3 = c.line_h(D(13, 0.06f)), sm = c.line_h(tiny);
-  TextOpt note;
-  note.wrap = true;
-  note.max_w = cw;
-  note.line_h = 12 * 1.45f;
-  std::wstring source = std::wstring(L"Источник — последний релиз в ") + kRepoText + L".";
-  float note_h = c.measure(source, tiny, note).height;
-  float h_updates = 2 + 14 + h3 + 2 + 6 + 44 + 6 + 44 + 6 + note_h + 16 + 2;
+  float h_updates = 2 + 14 + h3 + 2 + 6 + 44 + 6 + 44 + 6 + 44 + 16 + 2;
   float h_net = 2 + 14 + h3 + 8 + sm + 8 + 44 + 8 + sm + 8 + 40 + 16 + 2;
   float row1 = h_updates > h_net ? h_updates : h_net;
   float h_game = 2 + 14 + h3 + 8 + 44 + 8 + 44 + 8 + 44 + 16 + 2;
   float h_look = 2 + 14 + h3 + 8 + sm + 8 + 56 + 8 + 44 + 16 + 2;
   float row2 = h_game > h_look ? h_game : h_look;
-  float y1 = top + 44 + 16, y2 = y1 + row1 + 18;
+  float y1 = top + 44 + 16, y2 = y1 + row1 + 16;
 
   // updates
   Section s = section_begin(x, x1, y1, col_w, row1, L"ОБНОВЛЕНИЯ");
   float y = s.cy + 2 + 6;
   toggle_row(x, H_Toggle1, L"Проверять при запуске", m.set.auto_check, s.cx, y, cw);
   y += 44 + 6;
-  toggle_row(x, H_Toggle2, L"Ставить обновления без вопроса", m.set.auto_install, s.cx, y, cw);
+  toggle_row(x, H_Toggle4, L"Обновлять лаунчер при запуске", m.set.auto_self, s.cx, y, cw);
   y += 44 + 6;
-  c.text(source, tiny, s.cx, y, MUTED, note);
+  toggle_row(x, H_Toggle2, L"Ставить обновления мода без вопроса", m.set.auto_install, s.cx, y, cw);
 
   // the network
   s = section_begin(x, x2, y1, col_w, row1, L"СЕТЬ");
@@ -1186,13 +1181,17 @@ void page_game(Ctx& x, float left, float top, bool sound) {
     std::wstring note;
     uint32_t note_rgb;
   };
+  const wchar_t *old_levels = gset::needs_mod(gset::kMusic), *old_mode = gset::needs_mod(gset::kSoundMode);
   const Group groups[2][2] = {
       {{L"ЭКРАН", gset::kMode, gset::kFirstPicture, L"", MUTED}, {L"КАРТИНКА", gset::kFirstPicture, gset::kFirstSound, L"", MUTED}},
       {{L"ГРОМКОСТЬ", gset::kFirstSound, gset::kFirstGame,
-        gset::keeps_levels() ? L"Громкость запоминает мод: сама игра хранит её только в сохранении."
-                             : L"Громкость из лаунчера понимает мод 0.17.2 и новее: обновите мод.",
-        gset::keeps_levels() ? MUTED : WAIT},
-       {L"ИГРА", gset::kFirstGame, gset::kRows, L"В сетевой игре игра не останавливается никогда — и в фоне тоже.", MUTED}}};
+        old_levels ? std::wstring(L"Громкость из лаунчера понимает мод ") + old_levels + L" и новее: обновите мод."
+                   : std::wstring(L"Громкость и режим звука запоминает мод: сама игра хранит их только в сохранении."),
+        old_levels ? WAIT : MUTED},
+       {L"ЗВУЧАНИЕ", gset::kFirstGame, gset::kRows,
+        old_mode ? std::wstring(L"Режим звука из лаунчера понимает мод ") + old_mode + L" и новее: обновите мод."
+                 : std::wstring(L"В сетевой игре игра не останавливается никогда — и в фоне тоже."),
+        old_mode ? WAIT : MUTED}}};
   const Group* page = groups[sound ? 1 : 0];
   const float col_w = (kW - 2 * left - 28) / 2.0f, cw = col_w - 4 - 32;
   const int most = std::max(page[0].to - page[0].from, page[1].to - page[1].from);
@@ -1222,8 +1221,8 @@ void page_game(Ctx& x, float left, float top, bool sound) {
   }
   const bool mod = gset::has_mod();
   const wchar_t* note = !mod ? kNoMod
-                        : sound ? L"Громкость — та же, что в игре: ОПЦИИ → ЗВУК. Заставки и игра в фоне — НАСТРОЙКИ МОДА в главном "
-                                  L"меню игры. Действует со следующего запуска игры."
+                        : sound ? L"Громкость и режим звука — те же, что в игре: ОПЦИИ → ЗВУК. Заставки и игра в фоне — НАСТРОЙКИ "
+                                  L"МОДА в главном меню игры. Действует со следующего запуска игры."
                                 : L"Настройки мода из tmnt2net.ini — те же строки, что в игре: ОПЦИИ → ЭКРАН. Действуют со следующего "
                                   L"запуска игры.";
   page_foot(x, left, note, mod ? MUTED : WAIT, mod);
@@ -1386,11 +1385,18 @@ bool demo(const std::wstring& screen, Model& m) {
   } else if (screen == L"settings") {
     m.screen = Screen::Settings;
     m.back = Screen::Update;
+  } else if (screen == L"selfupdate") {  // at its start the launcher found a newer one and takes it by itself
+    m.screen = Screen::Downloading;
+    m.pending = Pending::Launcher;
+    m.inst.version = L"0.17.0";
+    m.inst.protocol = 15;
+    m.pack = m.rel;
+    m.rel.launcher_version = L"1.3.1";
   } else if (screen == L"graphics" || screen == L"sound" || screen == L"controls" || screen == L"controls2" ||
              screen == L"capture") {
     m.screen = Screen::Settings;
     m.back = Screen::Ready;
-    m.inst.version = L"0.17.2";
+    m.inst.version = L"0.17.3";
     m.inst.protocol = 16;
     m.tab = screen == L"graphics" ? Tab::Graphics : screen == L"sound" ? Tab::Sound : Tab::Controls;
     gset::load_canned(screen == L"controls2");

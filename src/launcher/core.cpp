@@ -32,7 +32,7 @@ const struct {
   const wchar_t *from, *to;
   int protocol;
 } kProtocols[] = {
-    {L"0.17.1", L"0.17.2", 16}, {L"0.17.0", L"0.17.0", 15}, {L"0.16.6", L"0.16.7", 14}, {L"0.16.4", L"0.16.5", 13}, {L"0.16.3", L"0.16.3", 12},
+    {L"0.17.1", L"0.17.3", 16}, {L"0.17.0", L"0.17.0", 15}, {L"0.16.6", L"0.16.7", 14}, {L"0.16.4", L"0.16.5", 13}, {L"0.16.3", L"0.16.3", 12},
     {L"0.16.0", L"0.16.2", 11}, {L"0.14.0", L"0.15.0", 10}, {L"0.13.0", L"0.13.0", 9},  {L"0.12.2", L"0.12.2", 8},
     {L"0.12.0", L"0.12.1", 7},  {L"0.10.0", L"0.11.0", 6},  {L"0.9.0", L"0.9.1", 5},    {L"0.8.0", L"0.8.0", 4},
 };
@@ -269,15 +269,6 @@ bool writable(const std::wstring& dir) {
   return true;
 }
 
-// A path as one argument of a command line (a backslash before the closing quote would swallow it).
-std::wstring quoted(std::wstring path) {
-  size_t tail = 0;
-  while (tail < path.size() && path[path.size() - 1 - tail] == L'\\') ++tail;
-  return L"\"" + path + std::wstring(tail, L'\\') + L"\"";
-}
-
-// This launcher again, with the rights of an administrator (the Windows prompt), to put the mod into a
-// folder this user may not write to or take it out of there. Waits for it; its exit code.
 int run_elevated(const std::wstring& args, bool* denied) {
   *denied = false;
   wchar_t self[MAX_PATH] = {};
@@ -441,6 +432,16 @@ Step wait_for_game(const std::wstring& dir, const UpdateHooks& hooks, const std:
 
 std::wstring downloads_dir() { return cache_dir(); }
 
+// A path as one argument of a command line (a backslash before the closing quote would swallow it).
+std::wstring quoted(std::wstring path) {
+  size_t tail = 0;
+  while (tail < path.size() && path[path.size() - 1 - tail] == L'\\') ++tail;
+  return L"\"" + path + std::wstring(tail, L'\\') + L"\"";
+}
+
+// This launcher again, with the rights of an administrator (the Windows prompt), to put the mod into a
+// folder this user may not write to or take it out of there. Waits for it; its exit code.
+
 std::wstring join(const std::wstring& dir, const std::wstring& name) {
   if (dir.empty()) return name;
   wchar_t last = dir.back();
@@ -498,6 +499,8 @@ void load_settings(Settings& s) {
   s.game_dir = ini_get(f, L"launcher", L"game_dir");
   s.auto_check = ini_get(f, L"launcher", L"auto_check", L"1") != L"0";
   s.auto_install = ini_get(f, L"launcher", L"auto_install", L"0") == L"1";
+  s.auto_self = ini_get(f, L"launcher", L"auto_self", L"1") != L"0";
+  s.self_skip = ini_get(f, L"launcher", L"self_skip");
   s.close_on_play = ini_get(f, L"launcher", L"close_on_play", L"1") != L"0";
   s.proxy = _wtoi(ini_get(f, L"launcher", L"proxy", L"0").c_str());
   if (s.proxy < 0 || s.proxy > 2) s.proxy = 0;
@@ -528,6 +531,8 @@ void save_settings(const Settings& s) {
   ini_set(f, L"launcher", L"game_dir", s.game_dir);
   ini_set(f, L"launcher", L"auto_check", s.auto_check ? L"1" : L"0");
   ini_set(f, L"launcher", L"auto_install", s.auto_install ? L"1" : L"0");
+  ini_set(f, L"launcher", L"auto_self", s.auto_self ? L"1" : L"0");
+  ini_set(f, L"launcher", L"self_skip", s.self_skip);
   ini_set(f, L"launcher", L"close_on_play", s.close_on_play ? L"1" : L"0");
   ini_set(f, L"launcher", L"proxy", std::to_wstring(s.proxy));
   ini_set(f, L"launcher", L"proxy_addr", s.proxy_addr);
@@ -870,10 +875,12 @@ bool replace_self(const std::wstring& newer) {
   return true;
 }
 
-void drop_old_self() {
+bool drop_old_self() {
   wchar_t self[MAX_PATH] = {};
   GetModuleFileNameW(nullptr, self, MAX_PATH);
-  DeleteFileW((std::wstring(self) + L".old").c_str());
+  std::wstring old = std::wstring(self) + L".old";
+  DeleteFileW(old.c_str());
+  return !exists(old);  // (false while the launcher it was is still closing)
 }
 
 }  // namespace core

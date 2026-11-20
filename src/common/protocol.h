@@ -19,7 +19,7 @@
 // 9 = 0.13.0, 10 = 0.14.0 (sessions in a running game), 11 = 0.16.0 (costumes), 12 = 0.16.3 (every hero),
 // 13 = 0.16.4 (pause in a session), 14 = 0.16.6 (no move boundary between the players of a session),
 // 15 = 0.17.0 (what is near any player counts as in the stage camera's view; RosterPacket::lead).
-// 16 = 0.17.1 (the area map's menu opens by a pad's SELECT too: the keyboard's Esc); 0.17.2 speaks it too.
+// 16 = 0.17.1 (the area map's menu opens by a pad's SELECT too: the keyboard's Esc); 0.17.2 and 0.17.3 speak it too.
 #pragma once
 #include <cstddef>
 #include <cstdint>

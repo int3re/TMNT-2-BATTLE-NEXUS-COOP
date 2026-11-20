@@ -21,7 +21,7 @@
 namespace lz {
 
 constexpr int kW = 960, kH = 600;  // the window, in units of 1/96 inch
-constexpr wchar_t kLauncherVersion[] = L"1.2.0";
+constexpr wchar_t kLauncherVersion[] = L"1.3.0";
 constexpr wchar_t kRepoUrl[] = L"https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 constexpr wchar_t kRepoText[] = L"github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 
@@ -52,7 +52,9 @@ struct Installed {
 struct Settings {
   std::wstring game_dir;
   bool auto_check = true;
+  bool auto_self = true;     // a newer launcher on GitHub takes this one's place at the start, by itself
   bool auto_install = false;
+  std::wstring self_skip;    // a launcher version that could not take this one's place: not tried by itself again
   bool close_on_play = true;
   int proxy = 0;  // 0 automatic, 1 none, 2 the address below
   std::wstring proxy_addr;
@@ -108,7 +110,7 @@ enum HitId {
   H_None = 0,
   H_Settings, H_Min, H_Close,
   H_Primary, H_Secondary, H_Folder, H_PaperLink, H_Copy, H_Cancel, H_Repo, H_NewLauncher,
-  H_Back, H_Toggle1, H_Toggle2, H_Toggle3, H_ProxyAuto, H_ProxyNone, H_ProxyOwn, H_ProxyField,
+  H_Back, H_Toggle1, H_Toggle2, H_Toggle3, H_Toggle4, H_ProxyAuto, H_ProxyNone, H_ProxyOwn, H_ProxyField,
   H_FolderSettings, H_OpenLog, H_DesyncLogs, H_Reinstall, H_Uninstall,
   H_Accent0, H_Accent1, H_Accent2, H_Accent3,
   H_Tab0, H_Tab1, H_Tab2, H_Tab3,                      // the settings' pages
@@ -212,7 +214,8 @@ Step uninstall(const Settings& s, const UpdateHooks& hooks, const std::atomic<bo
 Step fetch_launcher(const Release& rel, const Settings& s, const net::Route& first, const UpdateHooks& hooks,
                     const std::atomic<bool>& cancel, std::wstring* log, std::wstring* package_file);
 bool replace_self(const std::wstring& newer);
-void drop_old_self();
+bool drop_old_self();  // true: nothing of the launcher this one replaced is left
+std::wstring quoted(std::wstring path);  // a path as one argument of a command line
 }  // namespace core
 
 namespace pkg {

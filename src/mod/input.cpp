@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <cwctype>
 #include <string>
 #include <vector>
 
@@ -145,41 +146,55 @@ void keys_frame() {
   }
 }
 
-// --- the sound levels, kept by tmnt2net as the keys are ------------------------------------------------
-// The game keeps its sound levels in the save as well: every start is at full volume until a save is
-// loaded, and a game that was never saved forgets them. tmnt2net keeps them in tmnt2net.ini ([audio]
-// music / effects / voices, 0..10) and holds the game to them: set at the start, put back after every
-// load, taken over when the player moves one on the game's ЗВУК page. The launcher's ЗВУК page writes
-// the same three keys.
-constexpr int kLevels = 3;
-const wchar_t* const kLevelKeys[kLevels] = {L"effects", L"music", L"voices"};  // as CSoundOptionData has them
-int32_t g_levels[kLevels];
-bool g_levels_seen = false;  // g_levels holds what the game has
-bool g_levels_ours = false;  // ... and tmnt2net.ini has them: they stand against a save's
+// --- the sound settings, kept by tmnt2net as the keys are ----------------------------------------------
+// The game keeps its sound mode and levels in the save as well: every start is in stereo at full volume
+// until a save is loaded, and a game that was never saved forgets them. tmnt2net keeps them in
+// tmnt2net.ini ([audio] mode = mono | stereo; music / effects / voices = 0..10) and holds the
+// game to them: set at the start, put back after every load, taken over when the player changes one on
+// the game's ЗВУК page. The launcher's ЗВУК page writes the same four keys.
+constexpr int kSound = 4;  // the head of CSoundOptionData: the mode, then the levels of effects, music, voices
+const wchar_t* const kSoundKeys[kSound] = {L"mode", L"effects", L"music", L"voices"};
+const wchar_t* const kSoundModes[game::kSoundModes] = {L"mono", L"stereo"};
+int32_t g_sound[kSound];
+bool g_sound_seen = false;  // g_sound holds what the game has
+bool g_sound_ours = false;  // ... and tmnt2net.ini has it: it stands against a save's
 
-int32_t* game_levels() {
+int32_t* game_sound() {
   uint8_t* o = patch::read<uint8_t*>(game::kOptionDataPtr);
-  return o ? reinterpret_cast<int32_t*>(o + game::kOptSound + game::kSoundLevels) : nullptr;
+  return o ? reinterpret_cast<int32_t*>(o + game::kOptSound) : nullptr;
 }
 
-bool levels_usable(const int32_t* v) {
-  for (int i = 0; i < kLevels; ++i)
+bool sound_usable(const int32_t* v) {
+  if (v[0] < 0 || v[0] >= game::kSoundModes) return false;
+  for (int i = 1; i < kSound; ++i)
     if (v[i] < 0 || v[i] > game::kSoundLevelMax) return false;
   return true;
 }
 
-void save_levels() {
-  for (int i = 0; i < kLevels; ++i)
-    WritePrivateProfileStringW(L"audio", kLevelKeys[i], std::to_wstring(g_levels[i]).c_str(), ini_path().c_str());
-  g_levels_ours = true;
+void save_sound() {
+  for (int i = 0; i < kSound; ++i)
+    WritePrivateProfileStringW(L"audio", kSoundKeys[i], i == 0 ? kSoundModes[g_sound[0]] : std::to_wstring(g_sound[i]).c_str(),
+                               ini_path().c_str());
+  g_sound_ours = true;
 }
 
-// The levels of the ini over `out` (the game's own where a key is missing). False: the ini has none.
-bool load_levels(int32_t* out) {
+// The ini's sound settings over `out` (the game's own where a key is missing). False: the ini has none.
+bool load_sound(int32_t* out) {
   bool any = false;
-  for (int i = 0; i < kLevels; ++i) {
-    wchar_t buf[16] = {};
-    GetPrivateProfileStringW(L"audio", kLevelKeys[i], L"", buf, 16, ini_path().c_str());
+  for (int i = 0; i < kSound; ++i) {
+    wchar_t buf[32] = {};
+    GetPrivateProfileStringW(L"audio", kSoundKeys[i], L"", buf, 32, ini_path().c_str());
+    if (wchar_t* semi = wcschr(buf, L';')) *semi = 0;  // (a comment after the value)
+    size_t n = wcslen(buf);
+    while (n && iswspace(buf[n - 1])) buf[--n] = 0;
+    if (i == 0) {
+      for (int m = 0; m < game::kSoundModes; ++m)
+        if (_wcsicmp(buf, kSoundModes[m]) == 0) {
+          out[0] = m;
+          any = true;
+        }
+      continue;
+    }
     wchar_t* end = buf;
     long v = wcstol(buf, &end, 10);
     if (end == buf) continue;  // (no key, or not a number)
@@ -189,39 +204,40 @@ bool load_levels(int32_t* out) {
   return any;
 }
 
-void put_levels(const int32_t* v) {  // into the game's options, and to its sound
+void put_sound(const int32_t* v) {  // into the game's options, and to its sound
   uint8_t* o = patch::read<uint8_t*>(game::kOptionDataPtr);
   if (!o) return;
-  std::memcpy(o + game::kOptSound + game::kSoundLevels, v, sizeof(g_levels));
+  std::memcpy(o + game::kOptSound, v, sizeof(g_sound));
   if (patch::bytes_are(game::kSoundOptionApply, game::kSoundOptionApplyHead, sizeof(game::kSoundOptionApplyHead)))
     reinterpret_cast<void(__fastcall*)(uint8_t*, void*)>(game::kSoundOptionApply)(o + game::kOptSound, nullptr);
 }
 
-void levels_frame() {
-  int32_t* g = game_levels();
-  if (!g || !levels_usable(g)) return;
-  if (!g_levels_seen) {
-    g_levels_seen = true;
-    std::memcpy(g_levels, g, sizeof(g_levels));
-    if (load_levels(g_levels)) {
-      g_levels_ours = true;
-      put_levels(g_levels);
-      LOGI("input: the sound levels from tmnt2net.ini: music %d, effects %d, voices %d", g_levels[1], g_levels[0], g_levels[2]);
+void sound_frame() {
+  int32_t* g = game_sound();
+  if (!g || !sound_usable(g)) return;
+  if (!g_sound_seen) {
+    g_sound_seen = true;
+    std::memcpy(g_sound, g, sizeof(g_sound));
+    if (load_sound(g_sound)) {
+      g_sound_ours = true;
+      put_sound(g_sound);
+      LOGI("input: the sound settings from tmnt2net.ini: %ls, music %d, effects %d, voices %d", kSoundModes[g_sound[0]],
+           g_sound[2], g_sound[1], g_sound[3]);
     }
     return;
   }
-  if (std::memcmp(g, g_levels, sizeof(g_levels)) != 0) {  // moved on the game's page (or by a first save)
-    std::memcpy(g_levels, g, sizeof(g_levels));
-    save_levels();
-    LOGI("input: the sound levels are kept in tmnt2net.ini: music %d, effects %d, voices %d", g_levels[1], g_levels[0],
-         g_levels[2]);
+  if (std::memcmp(g, g_sound, sizeof(g_sound)) != 0) {  // changed on the game's page (or by a first save)
+    std::memcpy(g_sound, g, sizeof(g_sound));
+    save_sound();
+    LOGI("input: the sound settings are kept in tmnt2net.ini: %ls, music %d, effects %d, voices %d", kSoundModes[g_sound[0]],
+         g_sound[2], g_sound[1], g_sound[3]);
   }
 }
 
 using OptionRestore_t = void(__fastcall*)(uint8_t* self, void* edx, const void* raw);
 OptionRestore_t oOptionRestore = nullptr;
 
-// A save's options come back (CGameData::Load): the player's keys and sound levels stay, and in a network
+// A save's options come back (CGameData::Load): the player's keys and sound settings stay, and in a network
 // session the options that are part of the game's logic stay the session's (every PC loads its own save
 // there).
 void __fastcall hkOptionRestore(uint8_t* self, void* edx, const void* raw) {
@@ -231,7 +247,7 @@ void __fastcall hkOptionRestore(uint8_t* self, void* edx, const void* raw) {
   if (self != patch::read<uint8_t*>(game::kOptionDataPtr)) return;
   // (the game applies the options next)
   if (g_keys_seen && g_keys_ours) std::memcpy(self + game::kOptKeys, g_keys, sizeof(g_keys));
-  if (g_levels_seen && g_levels_ours) std::memcpy(self + game::kOptSound + game::kSoundLevels, g_levels, sizeof(g_levels));
+  if (g_sound_seen && g_sound_ours) std::memcpy(self + game::kOptSound, g_sound, sizeof(g_sound));
 }
 IDirectInputDevice8A* g_keyboard = nullptr;
 
@@ -445,7 +461,7 @@ void install(const Config& cfg) {
     patch::hook("GetDigitalTrigger (Esc goes back in menus)", game::kGetDigitalTrigger, (void*)&hkDigitalTrigger,
                 (void**)&oDigitalTrigger);
   if (patch::bytes_are(game::kOptionRestore, game::kOptionRestoreHead, sizeof(game::kOptionRestoreHead)))
-    patch::hook("COptionData::Restore (the player's keys, sound levels and a session's options stay)", game::kOptionRestore,
+    patch::hook("COptionData::Restore (the player's keys, sound settings and a session's options stay)", game::kOptionRestore,
                 (void*)&hkOptionRestore, (void**)&oOptionRestore);
   // (always: the mouse's buttons reach the game through the keyboard's state)
   patch::import("DINPUT8.dll", "DirectInput8Create", (void*)&hkDI8Create, (void**)&oDI8Create);
@@ -472,7 +488,7 @@ void set_layout(int which) {
 
 void on_frame() {
   keys_frame();
-  levels_frame();
+  sound_frame();
   esc_frame();
   pads::on_frame();
   double t = now_s();

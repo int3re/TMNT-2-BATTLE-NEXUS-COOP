@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.17.2" src="https://img.shields.io/badge/version-0.17.2-2ea44f">
-  <img alt="launcher 1.2.0" src="https://img.shields.io/badge/launcher-1.2.0-8BE836">
+  <img alt="version 0.17.3" src="https://img.shields.io/badge/version-0.17.3-2ea44f">
+  <img alt="launcher 1.3.0" src="https://img.shields.io/badge/launcher-1.3.0-8BE836">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="1–4 players" src="https://img.shields.io/badge/players-1–4-f59e0b">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/network-Steam%20·%20LAN%20·%20IP-1b2838">
@@ -70,7 +70,7 @@ interface is in Russian.
 | **Installs the mod offline** | the mod is inside the launcher; the game's files are not changed |
 | **Updates with one button** | the new version is downloaded from GitHub, checked against its SHA-256 and installed; settings and saves stay |
 | **Tells you whether you can still play with friends** | it shows the network protocol of both versions: "does not join 0.16.7 — update the whole team" |
-| **Updates itself** | a new version of the mod arrives as a new launcher, which takes the old one's place |
+| **Updates itself** | at its start it downloads a newer launcher, checks its SHA-256, puts it in its own place and restarts; the new version of the mod is already inside |
 | **Sets the game up** | the Graphics, Sound and Controls tabs: the picture, the volume and the keys, before the game starts |
 | **Waits while the game is open** | or asks it to close, the way its window's close button does |
 | **Works where GitHub is hard to reach** | it tries the Windows settings, a VPN client on the same PC, or your proxy |
@@ -286,7 +286,7 @@ The detailed pages are in Russian.
 
 ## Versions and compatibility
 
-The current version is **0.17.2**; it is shown under the game's title menu.
+The current version is **0.17.3**; it is shown under the game's title menu.
 
 In a network game everyone needs a compatible version of the mod: the game must run identically on every PC,
 so any change to how it plays also changes the protocol version. The host refuses a player with an
@@ -294,7 +294,7 @@ incompatible version and says why.
 
 | Mod versions | Play together |
 |---|---|
-| 0.17.1 – 0.17.2 | yes |
+| 0.17.1 – 0.17.3 | yes |
 | 0.17.0 | with 0.17.0 only |
 | 0.16.6 – 0.16.7 | yes |
 | 0.16.4 – 0.16.5 | yes |

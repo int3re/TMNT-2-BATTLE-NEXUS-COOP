@@ -12,10 +12,10 @@ enum Row {
   kMode, kResolution, kAspect, kHud, kMap, kGauges, kGaugesSize,              // ГРАФИКА: the screen
   kAntialiasing, kAnisotropy, kSharpen, kColors, kFov, kOwnCamera, kVsync,   //          the picture
   kMusic, kEffects, kVoices,                                                  // ЗВУК: how loud
-  kIntro, kBackground,                                                        //       the game
+  kSoundMode, kIntro, kBackground,                                            //       how it sounds
   kRows
 };
-constexpr int kFirstPicture = kAntialiasing, kFirstSound = kMusic, kFirstGame = kIntro;
+constexpr int kFirstPicture = kAntialiasing, kFirstSound = kMusic, kFirstGame = kSoundMode;
 constexpr int kLevelMax = 10;  // a sound level: 0 (silent) .. 10
 
 enum class Kind { Choice, Level, Pair };  // values with arrows; 0..10; two buttons
@@ -26,8 +26,10 @@ void load(const std::wstring& game_dir, const std::wstring& mod_version);
 // Values for a picture: no file is read or written.
 void load_canned(bool two_players);
 
-bool has_mod();       // tmnt2net.ini is there
-bool keeps_levels();  // the installed mod reads [audio] (0.17.2 and newer; an unknown version counts)
+bool has_mod();  // tmnt2net.ini is there
+// The first version of the mod that reads this row's key, if the installed one is older (else null): the
+// sound levels came with 0.17.2, the sound mode with 0.17.3. A mod of an unknown version counts as new.
+const wchar_t* needs_mod(Row r);
 
 Kind kind(Row r);
 const wchar_t* label(Row r);
@@ -39,7 +41,7 @@ std::wstring name(Row r, int v);   // a value's words
 
 // Sets a value and writes the file. False: not written, error() says why.
 bool set(Row r, int v);
-// The mod's defaults for the rows of a page (1 ГРАФИКА, 2 ЗВУК).
+// The mod's defaults for the rows of a page (1 ГРАФИКА, 2 ЗВУК): those of them that can be set.
 bool reset(int page);
 const std::wstring& error();
 std::wstring ini_file();  // where the settings are read and written (a copy Windows keeps for the game

@@ -20,7 +20,6 @@ namespace gset {
 namespace {
 
 const wchar_t kIni[] = L"tmnt2net.ini";
-const wchar_t kLevelsSince[] = L"0.17.2";  // the first mod that reads [audio]
 
 struct Choice {
   const wchar_t* name;
@@ -34,6 +33,7 @@ struct Info {
   const wchar_t* ini;
   const wchar_t* fallback;  // the value when the ini has none: the mod's default
   std::vector<Choice> choices;
+  const wchar_t* since = nullptr;  // the first version of the mod that reads the key (null: every one)
 };
 // The values are the ones the game's own pages offer (src/mod/menus.cpp).
 const Info kInfo[kRows] = {
@@ -64,9 +64,10 @@ const Info kInfo[kRows] = {
      {{L"На своего героя", L"1"}, {L"Одна на всех", L"0"}}},
     {L"Синхронизация", "vsync", Kind::Choice, L"video", L"vsync", L"-1",
      {{L"Как в игре", L"-1"}, {L"Выключена", L"0"}, {L"Включена", L"1"}}},
-    {L"Музыка", "music", Kind::Level, L"audio", L"music", L"10", {}},
-    {L"Эффекты", "effects", Kind::Level, L"audio", L"effects", L"10", {}},
-    {L"Голоса", "voices", Kind::Level, L"audio", L"voices", L"10", {}},
+    {L"Музыка", "music", Kind::Level, L"audio", L"music", L"10", {}, L"0.17.2"},
+    {L"Эффекты", "effects", Kind::Level, L"audio", L"effects", L"10", {}, L"0.17.2"},
+    {L"Голоса", "voices", Kind::Level, L"audio", L"voices", L"10", {}, L"0.17.2"},
+    {L"Режим звука", "sound_mode", Kind::Pair, L"audio", L"mode", L"stereo", {{L"Стерео", L"stereo"}, {L"Моно", L"mono"}}, L"0.17.3"},
     {L"Заставки", "intro", Kind::Pair, L"video", L"intro", L"show", {{L"Показывать", L"show"}, {L"Пропускать", L"skip"}}},
     {L"Игра в фоне", "background", Kind::Pair, L"video", L"background", L"pause",
      {{L"Стоит", L"pause"}, {L"Продолжается", L"run"}}},
@@ -114,7 +115,8 @@ struct Res {
 
 struct State {
   std::wstring dir, ini;  // the folder; tmnt2net.ini where the game reads it
-  bool mod = false, canned = false, levels = true;
+  bool mod = false, canned = false;
+  std::wstring version;  // of the installed mod (empty: not known)
   int cur[kRows] = {};
   std::vector<Res> res;
   int key[kSlots];
@@ -231,7 +233,7 @@ bool is_number(const std::wstring& v) { return !v.empty() && (iswdigit(v[0]) || 
 // choices (an ini written by hand), else the mod's default.
 int index_of(const Info& info, std::wstring v) {
   const std::wstring key = info.ini;
-  if (key == L"mode" && v == L"fullscreen") v = L"borderless";  // (none since 0.17.0)
+  if (key == L"mode" && std::wstring(info.section) == L"video" && v == L"fullscreen") v = L"borderless";  // (none since 0.17.0)
   if (key == L"aspect" && (v == L"wide" || v == L"hor+")) v = L"auto";
   if (key == L"intro") v = v == L"1" ? L"skip" : v == L"0" ? L"show" : v;
   if (v.empty()) v = info.fallback;
@@ -346,7 +348,7 @@ void load(const std::wstring& game_dir, const std::wstring& mod_version) {
   g.canned = false;
   g.dir = game_dir;
   g.ini = game_dir.empty() ? std::wstring() : seen(game_dir);
-  g.levels = mod_version.empty() || core::compare_versions(mod_version, kLevelsSince) >= 0;
+  g.version = mod_version;
   g.error.clear();
   if (!g.ini.empty()) WritePrivateProfileStringW(nullptr, nullptr, nullptr, g.ini.c_str());  // (Windows' copy of it: let go)
   read_file();
@@ -362,14 +364,17 @@ void load_canned(bool two_players) {
 }
 
 bool has_mod() { return g.mod; }
-bool keeps_levels() { return g.levels; }
+const wchar_t* needs_mod(Row r) {
+  const wchar_t* since = kInfo[r].since;
+  return since && !g.version.empty() && core::compare_versions(g.version, since) < 0 ? since : nullptr;
+}
 const std::wstring& error() { return g.error; }
 std::wstring ini_file() { return g.ini; }
 
 Kind kind(Row r) { return kInfo[r].kind; }
 const wchar_t* label(Row r) { return kInfo[r].label; }
 const char* key(Row r) { return kInfo[r].key; }
-bool usable(Row r) { return g.mod && (kInfo[r].kind != Kind::Level || g.levels); }
+bool usable(Row r) { return g.mod && !needs_mod(r); }
 
 int count(Row r) {
   if (r == kResolution) return static_cast<int>(g.res.size());

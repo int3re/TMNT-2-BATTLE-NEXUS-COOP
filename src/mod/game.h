@@ -107,10 +107,11 @@ constexpr int kKeyMouseLeft = 0xF0, kKeyMouseRight = 0xF1, kKeyMouse4 = 0xF3, kK
 
 // --- sound volumes ---------------------------------------------------------------------------------
 // CSoundOptionData = COptionData + 8: {mode, SE, BGM, voice volume 0..10, default mode}; Apply 0x484110
-// (__thiscall) gives them to CGameSound: SetSeConfig 0x51B0D0, SetBgmConfig 0x51B090, SetVoiceConfig
-// 0x51B110 (__cdecl(int volume)).
+// (__thiscall) gives them to CGameSound: the mode 0x51B010 (0, 1, 2 send the driver 0x405, 0x404, 0x406),
+// SetSeConfig 0x51B0D0, SetBgmConfig 0x51B090, SetVoiceConfig 0x51B110 (__cdecl(int volume)).
 constexpr int kOptSound = 0x08;
-constexpr int kSoundLevels = 4, kSoundLevelMax = 10;  // SE, BGM, voice: three ints after the mode
+constexpr int kSoundModes = 2, kSoundLevelMax = 10;  // the mode: 0 mono, 1 stereo (CGameSound's own at its start); the
+                                                     // game's ЗВУК page offers these two (its code knows a third, 2)
 constexpr uintptr_t kSoundOptionApply = 0x484110;
 constexpr uint8_t kSoundOptionApplyHead[] = {0x56, 0x8B, 0xF1, 0x8B, 0x06, 0x85, 0xC0, 0xB9, 0x0A, 0x00, 0x00, 0x00};
 constexpr uintptr_t kSoundVolume[3] = {0x51B0D0, 0x51B090, 0x51B110};

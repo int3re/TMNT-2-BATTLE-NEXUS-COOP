@@ -6,10 +6,13 @@
 //   --shot <screen> <file.png> [--scale N] [--accent 0..3]   a screen of the design as a picture
 //   --check [--out file]                                     ask for the newest release, write what came
 //   --where [--out file]                                     where the game is found from here
+//   --after-update <version>                                 this launcher has just taken that one's place and was
+//                                                            started by it: it says so and updates itself no further
 // Tests: --settings <ini>, --cache <dir>, --repo <url> (the repository served from elsewhere), --pick <dir>
 // (the answer of the folder dialog), --drive "<script>" (the window stays hidden; wait:ms, click:name,
 // until:screen:ms, type:text, shot:file, keydown:vk:scan:extended, rdown, xdown:n, state, quit), --out <file>
-// (a log of what happened).
+// (a log of what happened), --drive-next "<script>" (the script of the launcher this one starts in its place:
+// without it a launcher run by a script starts no other).
 #include "launcher/launcher.h"
 
 #include <dwmapi.h>
@@ -40,6 +43,10 @@ std::atomic<bool> g_cancel{false};
 std::atomic<int> g_gen{0};       // checks: only the newest one's answer counts
 bool g_job = false;              // a download / install / removal runs
 bool g_startup_check = false;    // the check of the start (it may install by itself)
+bool g_self_auto = false;        // the job that runs is the launcher taking a newer one's place by itself, at the start
+std::wstring g_after_update;     // the version of the launcher this one has just replaced (it started this one)
+HANDLE g_once = nullptr;         // one launcher at a time
+ULONGLONG g_drop_old_until = 0;  // the file of the launcher this one replaced is removed once that one has closed
 net::Route g_route;              // the way to GitHub that worked last
 Pending g_last_job = Pending::None;
 ULONGLONG g_start = 0, g_confirm_until = 0, g_launch_until = 0, g_quit_at = 0;
@@ -47,7 +54,7 @@ bool g_tracking = false, g_dirty = true;
 
 // tests
 bool g_drive = false;
-std::wstring g_out, g_pick;
+std::wstring g_out, g_pick, g_drive_next;
 std::vector<std::wstring> g_script;
 size_t g_script_at = 0;
 ULONGLONG g_script_wait = 0, g_script_deadline = 0;
@@ -230,29 +237,95 @@ std::wstring reason(const std::wstring& log) {
   return out.empty() ? L"Причина не названа" : out;
 }
 
-// A newer launcher file is at hand (downloaded and checked): it takes this one's place.
-void take_newer_launcher(const std::wstring& file, bool say) {
+// A newer launcher file is at hand (downloaded and checked): it takes this one's place. True: it has.
+bool take_newer_launcher(const std::wstring& file, bool say) {
   pkg::Package p;
-  if (file.empty() || !p.open(file) || core::compare_versions(p.launcher_version, kLauncherVersion) <= 0) return;
+  if (file.empty() || !p.open(file) || core::compare_versions(p.launcher_version, kLauncherVersion) <= 0) return false;
   if (core::replace_self(file)) {
     g.swapped = true;
     logf(L"launcher replaced by " + p.launcher_version);
     if (say) flash(L"Лаунчер обновлён до " + p.launcher_version + L": новая версия откроется при следующем запуске", 7000);
-  } else {
-    logf(L"launcher NOT replaced");
-    if (say) flash(L"Лаунчер не смог заменить свой файл: скачайте новый со страницы релиза", 7000);
+    return true;
   }
+  logf(L"launcher NOT replaced");
+  if (say) flash(L"Лаунчер не смог заменить свой файл: скачайте новый со страницы релиза", 7000);
+  if (say && g.set.self_skip != p.launcher_version) {  // (a folder closed to its user: not tried by itself at every start)
+    g.set.self_skip = p.launcher_version;
+    core::save_settings(g.set);
+  }
+  return false;
+}
+
+// The newer launcher is in this one's place: it is started, and this one closes. A launcher run by a
+// script starts another only when the script says what that one is to do (--drive-next).
+void restart_self() {
+  if (g_drive && g_drive_next.empty()) {
+    logf(L"restart: not in a script");
+    return;
+  }
+  wchar_t self[MAX_PATH] = {};
+  GetModuleFileNameW(nullptr, self, MAX_PATH);
+  std::wstring cmd = core::quoted(self) + L" --after-update " + kLauncherVersion;
+  if (!core::g_settings_path.empty()) cmd += L" --settings " + core::quoted(core::g_settings_path);
+  if (!core::g_cache_dir.empty()) cmd += L" --cache " + core::quoted(core::g_cache_dir);
+  if (!core::g_repo_url.empty()) cmd += L" --repo " + core::quoted(core::g_repo_url);
+  if (!g_pick.empty()) cmd += L" --pick " + core::quoted(g_pick);
+  if (!g_out.empty()) cmd += L" --out " + core::quoted(g_out);
+  if (g_drive) cmd += L" --drive " + core::quoted(g_drive_next);
+  if (g_once) {  // (the one that starts must not find this one and step back)
+    ReleaseMutex(g_once);
+    CloseHandle(g_once);
+    g_once = nullptr;
+  }
+  STARTUPINFOW si{};
+  si.cb = sizeof(si);
+  PROCESS_INFORMATION pi{};
+  if (CreateProcessW(self, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    logf(L"restart: the newer launcher is started");
+    g_cancel = true;
+    DestroyWindow(g_hwnd);
+    return;
+  }
+  logf(L"restart: FAILED, error " + std::to_wstring(GetLastError()));
+  if (!g_drive) g_once = CreateMutexW(nullptr, TRUE, L"tmnt2net-launcher-running");
+}
+
+// A newer launcher on GitHub takes this one's place by itself: at the start, when nothing else goes on.
+bool wants_self_update() {
+  return g.set.auto_self && g_after_update.empty() && !g_job && !g.swapped && !g.launching && g.screen != Screen::Settings &&
+         g.rel.full && !g.assets_blocked && !g.rel.launcher_version.empty() && g.rel.launcher_version != g.set.self_skip &&
+         core::compare_versions(g.rel.launcher_version, kLauncherVersion) > 0;
+}
+
+// What the start goes on with once the launcher itself is settled: a newer mod installed without a question.
+void after_self_update() {
+  if (g.set.auto_install && g.screen == Screen::Update && !g_job) start_job(Pending::Install);
 }
 
 void on_done(Done* d) {
   g_job = false;
   g.pending = Pending::None;
+  const bool self = d->kind == Pending::Launcher && g_self_auto;
+  g_self_auto = false;
   logf(L"job done: step " + std::to_wstring(static_cast<int>(d->step)));
   for (size_t p = 0; p < d->log.size();) {
     size_t e = d->log.find(L'\n', p);
     if (e == std::wstring::npos) e = d->log.size();
     if (e > p) logf(L"  " + d->log.substr(p, e - p));
     p = e + 1;
+  }
+  if (self && d->step != core::Step::Ok) {  // (done by itself: no screen about it, the start goes on as it would)
+    go_decided();
+    if (d->step != core::Step::Cancelled) {
+      flash(d->step == core::Step::NetFail ? std::wstring(L"Лаунчер не обновился: загрузка не удалась. Играть можно как раньше")
+            : d->step == core::Step::BadSum ? std::wstring(L"Лаунчер не обновился: файл с GitHub повреждён. Играть можно как раньше")
+            : L"Лаунчер не обновился: " + reason(d->log), 7000);
+      after_self_update();
+    }
+    delete d;
+    return;
   }
   switch (d->step) {
     case core::Step::Ok:
@@ -270,7 +343,8 @@ void on_done(Done* d) {
         take_newer_launcher(d->package, false);
       } else if (d->kind == Pending::Launcher) {
         go_decided();
-        take_newer_launcher(d->package, true);
+        if (take_newer_launcher(d->package, true)) restart_self();
+        if (g_hwnd && self) after_self_update();  // (this launcher goes on: its file could not be replaced, or a script runs it)
       } else {
         go_decided();
         flash(L"Мод удалён из папки игры");
@@ -335,6 +409,11 @@ void on_check(int gen, core::CheckResult* r) {
   delete r;
   if (g.screen == Screen::Downloading || g.screen == Screen::Running || g.screen == Screen::Problem) return;
   go_decided();
+  if (startup && wants_self_update()) {
+    g_self_auto = true;
+    start_job(Pending::Launcher);
+    return;
+  }
   if (startup && g.set.auto_install && g.screen == Screen::Update) start_job(Pending::Install);
 }
 
@@ -574,6 +653,11 @@ void act(int id) {
       g.set.auto_install = !g.set.auto_install;
       core::save_settings(g.set);
       break;
+    case H_Toggle4:
+      g.set.auto_self = !g.set.auto_self;
+      g.set.self_skip.clear();  // (asked for again: tried again)
+      core::save_settings(g.set);
+      break;
     case H_Toggle3:
       g.set.close_on_play = !g.set.close_on_play;
       core::save_settings(g.set);
@@ -699,7 +783,7 @@ int hit_by_name(const std::wstring& n) {
   } names[] = {{L"settings", H_Settings}, {L"min", H_Min}, {L"close", H_Close}, {L"primary", H_Primary},
                {L"secondary", H_Secondary}, {L"folder", H_Folder}, {L"link", H_PaperLink}, {L"copy", H_Copy},
                {L"cancel", H_Cancel}, {L"repo", H_Repo}, {L"back", H_Back}, {L"t1", H_Toggle1}, {L"t2", H_Toggle2},
-               {L"t3", H_Toggle3}, {L"proxy_auto", H_ProxyAuto}, {L"proxy_none", H_ProxyNone}, {L"proxy_own", H_ProxyOwn},
+               {L"t3", H_Toggle3}, {L"t4", H_Toggle4}, {L"proxy_auto", H_ProxyAuto}, {L"proxy_none", H_ProxyNone}, {L"proxy_own", H_ProxyOwn},
                {L"proxy_field", H_ProxyField}, {L"folder2", H_FolderSettings}, {L"log", H_OpenLog}, {L"desync", H_DesyncLogs},
                {L"reinstall", H_Reinstall}, {L"uninstall", H_Uninstall}, {L"accent0", H_Accent0}, {L"accent1", H_Accent1},
                {L"accent2", H_Accent2}, {L"accent3", H_Accent3}};
@@ -736,7 +820,8 @@ int hit_by_name(const std::wstring& n) {
 
 // What the game's settings pages hold, for the log of a script.
 void log_state() {
-  std::wstring line = std::wstring(L"state: mod ") + (gset::has_mod() ? L"1" : L"0") + L" levels " + (gset::keeps_levels() ? L"1" : L"0");
+  std::wstring line = std::wstring(L"state: mod ") + (gset::has_mod() ? L"1" : L"0") + L" levels " +
+                      (gset::needs_mod(gset::kMusic) ? L"0" : L"1") + L" sound mode " + (gset::needs_mod(gset::kSoundMode) ? L"0" : L"1");
   for (int r = 0; r < gset::kRows; ++r) {
     const gset::Row row = static_cast<gset::Row>(r);
     line += L" | " + core::wide(gset::key(row)) + L"=" + gset::name(row, gset::value(row));
@@ -851,6 +936,7 @@ void tick(HWND hwnd) {
     DestroyWindow(hwnd);
     return;
   }
+  if (g_drop_old_until && (core::drop_old_self() || now > g_drop_old_until)) g_drop_old_until = 0;
   if (g_drive) drive();
   if (g_hwnd && (moving() || g_dirty) && !IsIconic(hwnd)) InvalidateRect(hwnd, nullptr, FALSE);
 }
@@ -1100,6 +1186,10 @@ int run(int argc, wchar_t** argv) {
     } else if (a == L"--drive") {
       g_drive = true;
       g_script = split(next(), L';');
+    } else if (a == L"--drive-next") {
+      g_drive_next = next();
+    } else if (a == L"--after-update") {
+      g_after_update = next();
     }
   }
   g_start = GetTickCount64();
@@ -1149,8 +1239,8 @@ int run(int argc, wchar_t** argv) {
   }
 
   // One launcher at a time: a second start shows the first one.
-  HANDLE once = g_drive ? nullptr : CreateMutexW(nullptr, TRUE, L"tmnt2net-launcher-running");
-  if (once && GetLastError() == ERROR_ALREADY_EXISTS) {
+  g_once = g_drive ? nullptr : CreateMutexW(nullptr, TRUE, L"tmnt2net-launcher-running");
+  if (g_once && GetLastError() == ERROR_ALREADY_EXISTS) {
     if (HWND other = FindWindowW(kClass, nullptr)) {
       ShowWindow(other, SW_RESTORE);
       SetForegroundWindow(other);
@@ -1201,7 +1291,13 @@ int run(int argc, wchar_t** argv) {
     }
   }
   g.pack = core::bundled();
-  core::drop_old_self();  // (what an update of the launcher itself left behind)
+  // What an update of the launcher itself left behind. The launcher this one has just replaced may still be
+  // closing: its file is removed as soon as it lets go of it.
+  if (!core::drop_old_self()) g_drop_old_until = GetTickCount64() + 15000;
+  if (!g_after_update.empty()) {
+    logf(L"started by launcher " + g_after_update + L" in its place");
+    flash(L"Лаунчер обновлён: " + g_after_update + L" → " + kLauncherVersion, 7000);
+  }
   refresh_installed();
   logf(std::wstring(L"start: game ") + (g.has_game ? L"found" : L"not found") + L", mod " +
        (g.inst.present ? (g.inst.version.empty() ? L"of an unknown version" : g.inst.version) : L"not installed") +
@@ -1234,7 +1330,7 @@ int run(int argc, wchar_t** argv) {
   }
   logf(L"exit");
   gfx::shutdown();
-  if (once) CloseHandle(once);
+  if (g_once) CloseHandle(g_once);
   return 0;
 }
 
