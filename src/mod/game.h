@@ -124,6 +124,28 @@ constexpr uintptr_t kMoveBoundary = 0x48CE90;
 constexpr uint8_t kMoveBoundaryHead[] = {0xA1, 0xB8, 0x48, 0x6D, 0x00, 0x83, 0xEC, 0x1C,
                                          0x56, 0x8B, 0x70, 0x1C, 0x85, 0xF6, 0x0F, 0x84};
 
+// --- what the stage camera sees: the game's logic asks ----------------------------------------------------
+// CMapCamera::IsPosVisible 0x503B90 (bool __thiscall(const RwV3d*); AI: "does my target see me" = both of us
+// on screen; the radar). CGimmickUtils::IsPositionVisible 0x4BBE70 (bool __cdecl(const RwV3d*)) and 0x4BC530
+// (bool __cdecl(const RwV3d*, float radius, bool test_z)): enemy generators ("out of sight": the enemy may
+// be removed), map effects, lights. The gunners' AI asks RwCameraFrustumTestSphere 0x54AA10
+// (int __cdecl(const RwCamera*, const RwSphere*), 0 = outside) itself, at 0x428E09: in view it shoots,
+// out of view only by chance.
+constexpr uintptr_t kMapCamIsPosVisible = 0x503B90;
+constexpr uint8_t kMapCamIsPosVisibleHead[] = {0x83, 0xEC, 0x0C, 0x56, 0x8B, 0xF1, 0x8B, 0x46,
+                                               0x04, 0x85, 0xC0, 0x75, 0x1C, 0x68, 0xC4, 0x94};
+constexpr uintptr_t kSpotVisible = 0x4BBE70;
+constexpr uint8_t kSpotVisibleHead[] = {0x8D, 0x44, 0x24, 0xC0, 0x83, 0xEC, 0x4C, 0x50,
+                                        0xE8, 0x93, 0x0F, 0xFD, 0xFF, 0x8B, 0x54, 0x24};
+constexpr uintptr_t kSphereVisible = 0x4BC530;
+constexpr uint8_t kSphereVisibleHead[] = {0x8A, 0x44, 0x24, 0x0C, 0x83, 0xEC, 0x50, 0x84,
+                                          0xC0, 0x56, 0x8B, 0x74, 0x24, 0x58, 0x74, 0x41};
+constexpr uintptr_t kRwCameraFrustumTestSphere = 0x54AA10;
+constexpr uint8_t kRwCameraFrustumTestSphereHead[] = {0x8B, 0x44, 0x24, 0x04, 0x8B, 0x54, 0x24, 0x08,
+                                                      0x56, 0x57, 0xBF, 0x02, 0x00, 0x00, 0x00, 0x8D};
+constexpr uintptr_t kGunnerFrustumCall = 0x428E09;
+constexpr uint8_t kGunnerFrustumCallOld[] = {0xE8, 0x02, 0x1C, 0x12, 0x00};
+
 // --- the pause menu --------------------------------------------------------------------------------
 // CGameStage::CheckPauseMenu 0x48DBF0 (__thiscall, no arguments; three stage sequences ask it every
 // frame the stage is not paused): on the PC it is CPCSpecific::IsKeyTrigger(DIK_ESCAPE) - the Esc KEY,

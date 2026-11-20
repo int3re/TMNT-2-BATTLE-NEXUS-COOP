@@ -165,6 +165,83 @@ bool __cdecl hkMoveBoundary(float* out, const float* in) {
   return false;
 }
 
+// --- the team's sight ---------------------------------------------------------------------------
+// What the game asks of its one stage camera - is this enemy in view? is this spot? - decides things: a
+// gunner shoots at once only in view, an enemy "sees" its target only when both are in view, an enemy
+// generator removes its enemies once they are out of sight, a map effect runs only in view. That camera
+// looks at the middle of the team. With the players free to part (above), a player far from the middle
+// met enemies that hardly fought and could vanish. In a session whatever is near any player counts as
+// in view as well - the same on every PC (the players' places are the game's state, like the camera).
+constexpr float kSightRadius = 14.0f;  // (a player's own screen shows about 10 to each side)
+int player_num();
+
+bool near_a_player(const float* pos, float radius) {
+  int n = player_num();
+  float reach = kSightRadius + (radius > 0 ? radius : 0);
+  for (int i = 0; i < n && i < 4; ++i) {
+    void* gp = reinterpret_cast<void*(__cdecl*)(int)>(game::kGamePlayer)(i);
+    if (!gp) continue;
+    void** vt = *reinterpret_cast<void***>(gp);
+    auto* p = reinterpret_cast<const float*(__fastcall*)(void*, void*)>(vt[game::kGpGetPosition / 4])(gp, nullptr);
+    if (!p) continue;
+    float dx = pos[0] - p[0], dz = pos[2] - p[2];
+    if (dx * dx + dz * dz <= reach * reach) {
+      static unsigned said = 0, count = 0;  // (asked only when the camera itself said "out of view")
+      if (++count == 1 || count % 2000 == 0)
+        if (said++ < 40) LOGD("sight: out of the stage camera's view but near player %d: in view (%u times so far)", i + 1, count);
+      return true;
+    }
+  }
+  return false;
+}
+
+using IsPosVisible_t = bool(__fastcall*)(void* camera, void* edx, const float* pos);
+using SpotVisible_t = bool(__cdecl*)(const float* pos);
+using SphereVisible_t = bool(__cdecl*)(const float* pos, float radius, int test_z);
+IsPosVisible_t oIsPosVisible = nullptr;
+SpotVisible_t oSpotVisible = nullptr;
+SphereVisible_t oSphereVisible = nullptr;
+
+bool __fastcall hkIsPosVisible(void* camera, void* edx, const float* pos) {
+  return oIsPosVisible(camera, edx, pos) || (netplay::active() && pos && near_a_player(pos, 0));
+}
+bool __cdecl hkSpotVisible(const float* pos) {
+  return oSpotVisible(pos) || (netplay::active() && pos && near_a_player(pos, 0));
+}
+bool __cdecl hkSphereVisible(const float* pos, float radius, int test_z) {
+  return oSphereVisible(pos, radius, test_z) || (netplay::active() && pos && near_a_player(pos, radius));
+}
+// (the gunners' own call of RwCameraFrustumTestSphere: 0 = outside)
+int __cdecl gunner_in_view(void* camera, const float* sphere) {
+  int r = reinterpret_cast<int(__cdecl*)(void*, const float*)>(game::kRwCameraFrustumTestSphere)(camera, sphere);
+  if (!r && netplay::active() && sphere && near_a_player(sphere, sphere[3])) r = 2;  // rwSPHEREINSIDE
+  return r;
+}
+
+void install_sight() {
+  bool ok = patch::bytes_are(game::kMapCamIsPosVisible, game::kMapCamIsPosVisibleHead, sizeof(game::kMapCamIsPosVisibleHead)) &&
+            patch::bytes_are(game::kSpotVisible, game::kSpotVisibleHead, sizeof(game::kSpotVisibleHead)) &&
+            patch::bytes_are(game::kSphereVisible, game::kSphereVisibleHead, sizeof(game::kSphereVisibleHead)) &&
+            patch::bytes_are(game::kRwCameraFrustumTestSphere, game::kRwCameraFrustumTestSphereHead,
+                             sizeof(game::kRwCameraFrustumTestSphereHead)) &&
+            patch::bytes_are(game::kGunnerFrustumCall, game::kGunnerFrustumCallOld, sizeof(game::kGunnerFrustumCallOld));
+  if (!ok) {
+    LOGW("coop: the camera's view tests not recognised: enemies far from the team's middle stay sluggish");
+    return;
+  }
+  patch::hook("network game: near any player = in view (CMapCamera::IsPosVisible)", game::kMapCamIsPosVisible,
+              (void*)&hkIsPosVisible, (void**)&oIsPosVisible);
+  patch::hook("network game: near any player = in view (a spot)", game::kSpotVisible, (void*)&hkSpotVisible,
+              (void**)&oSpotVisible);
+  patch::hook("network game: near any player = in view (a sphere)", game::kSphereVisible, (void*)&hkSphereVisible,
+              (void**)&oSphereVisible);
+  uint8_t call[5] = {0xE8, 0, 0, 0, 0};
+  int32_t rel = (int32_t)(reinterpret_cast<uintptr_t>(&gunner_in_view) - (game::kGunnerFrustumCall + 5));
+  std::memcpy(call + 1, &rel, 4);
+  patch::replace("network game: near any player = in view (the gunners' AI)", game::kGunnerFrustumCall,
+                 game::kGunnerFrustumCallOld, call, 5);
+}
+
 // --- area map: a turtle icon per player (CAreaWorkPool::KameIconDisp) ------------------------
 Method_t oKameIcon = nullptr;
 
@@ -682,6 +759,7 @@ void install(const Config& cfg) {
                 (void*)&hkMoveBoundary, (void**)&oMoveBoundary);
   else
     LOGW("coop: move boundary not recognised: the players are held together as in the game");
+  if (oMoveBoundary) install_sight();  // (the players can part: what is near any of them is in view)
   if (patch::bytes_are(game::kCameraChangeMove, game::kCameraChangeMoveHead, sizeof(game::kCameraChangeMoveHead)))
     patch::hook("in-stage transitions: the whole team jumps", game::kCameraChangeMove, (void*)&hkCameraChangeMove,
                 (void**)&oCameraChangeMove);

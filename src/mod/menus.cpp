@@ -263,8 +263,7 @@ void build_pages() {
       {u8"ОКНО И РАЗРЕШЕНИЕ", "WINDOW AND RESOLUTION",
        {
            {u8"ОКНО ИГРЫ", "SCREEN MODE", L"video", L"mode", L"borderless",
-            {{u8"НА ВЕСЬ МОНИТОР", "BORDERLESS", L"borderless"}, {u8"В ОКНЕ", "WINDOWED", L"windowed"},
-             {u8"КАК В ОРИГИНАЛЕ", "FULLSCREEN", L"fullscreen"}},
+            {{u8"НА ВЕСЬ МОНИТОР", "BORDERLESS", L"borderless"}, {u8"В ОКНЕ", "WINDOWED", L"windowed"}},
             u8"НА ВЕСЬ МОНИТОР: БЕЗ РАМКИ, МОЖНО СВОБОДНО ПЕРЕКЛЮЧАТЬСЯ В ДРУГИЕ ОКНА. ПОДХОДИТ ПОЧТИ ВСЕМ.",
             "BORDERLESS: NO FRAME, EASY TO SWITCH TO OTHER WINDOWS. RIGHT FOR ALMOST EVERYONE.", false},
            {u8"РАЗРЕШЕНИЕ", "RESOLUTION", L"video", L"resolution", L"auto", res,

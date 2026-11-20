@@ -17,7 +17,8 @@
 // 7 = 0.12.0, a player who joins a running game gets a turtle of the team at once (midjoin.cpp).
 // 8 = 0.12.2, Hello.player_id: a player back after a drop is known by it (or a Steam id), any name.
 // 9 = 0.13.0, 10 = 0.14.0 (sessions in a running game), 11 = 0.16.0 (costumes), 12 = 0.16.3 (every hero),
-// 13 = 0.16.4 (pause in a session), 14 = 0.16.6 (no move boundary between the players of a session).
+// 13 = 0.16.4 (pause in a session), 14 = 0.16.6 (no move boundary between the players of a session),
+// 15 = 0.17.0 (what is near any player counts as in the stage camera's view; RosterPacket::lead).
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -26,7 +27,7 @@
 namespace tmnp {
 
 constexpr uint32_t kMagic = 0x504E3254;  // bytes 'T','2','N','P'
-constexpr uint16_t kVersion = 14;
+constexpr uint16_t kVersion = 15;
 constexpr uint16_t kDefaultPort = 7790;  // TMNT1's tmntnet uses 7777
 constexpr int kMaxPlayers = 4;
 constexpr int kHistory = 8;  // frames repeated in every input / bundle packet
@@ -103,6 +104,10 @@ struct RosterPacket {
   uint8_t waiting;  // bit p: the host has been waiting for player p's input (0.10.0; was 0)
   char names[kMaxPlayers][32];
   uint16_t ping_ms[kMaxPlayers];
+  // How early each player's input comes to the host (0.17.0): the smallest lead, in frames, of a new
+  // input over the frame the host's own game is at, since the roster before (0 or less: the host's game
+  // had to wait for it); 127: not known. A client keeps its own input delay by its number.
+  int8_t lead[kMaxPlayers];
 };
 
 // The host's save, split; total 0 = the host has none (the client must not load its own).

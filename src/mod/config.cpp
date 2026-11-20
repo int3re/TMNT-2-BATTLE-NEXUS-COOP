@@ -226,6 +226,9 @@ bool load_config(const std::wstring& path, Config& cfg) {
   // The logos and the opening movie play again by default (0.14 - 0.16.1 ran them at once to the menu,
   // which a network game needed while it had to restart the game); a key or a click skips them. Once for
   // an ini of those versions: its "skip" was the default of that time, not the player's choice.
+  // 0.17.0: no exclusive fullscreen any more (netplay::prepare): an ini that asks for it says what it gets.
+  if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES && get(path, L"video", L"mode") == "fullscreen")
+    WritePrivateProfileStringW(L"video", L"mode", L"borderless", path.c_str());
   if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES && atoi(get(path, L"mod", L"settings").c_str()) < 3) {
     if (get(path, L"video", L"intro") == "skip") WritePrivateProfileStringW(L"video", L"intro", L"show", path.c_str());
     WritePrivateProfileStringW(L"mod", L"settings", L"3", path.c_str());

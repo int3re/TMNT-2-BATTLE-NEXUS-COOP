@@ -107,6 +107,7 @@ bool take_begin(uint32_t* seed);
 // "НАЖМИ СТАРТ").
 void title_state(int phase, int step);
 // Own input for `frame` (sampled input_delay frames earlier).
+// (`frame`: the frame being played; the input goes to a later one, by the input delay)
 void submit(uint32_t frame, const sim::PadInput& pad, uint16_t movie, uint8_t flags);
 // The bundle of `frame`; waits for it, showing who is late. false: the session
 // ended (host gone / quit): the game goes on alone.

@@ -88,6 +88,9 @@ struct Player {
   bool hist_start = false;  // the session's progress and the start follow it (a game that joined anew)
   uint32_t hist_tick = 0, hist_said = 0, hist_wait = 0;
   double hist_budget = 0;   // bytes that may go now
+  // host: how early this player's inputs come (RosterPacket::lead)
+  uint32_t newest_in = 0;   // the newest frame an input of theirs came for
+  int lead_min = 127;       // its smallest lead over the host's game since the last roster
 };
 Player g_pl[kMax];
 uint8_t g_waiting = 0;  // bit p: the host has been waiting for player p's input (host: own; client: roster)
@@ -132,9 +135,56 @@ struct HSlot {
 };
 HSlot g_hash[kMax][64];     // host: hashes by player (own = slot 0); client: own (slot me)
 std::deque<HSlot> g_hash_out;  // client: to send
+// A client's own input delay. The host makes frame N only with every player's input for it: an input
+// that comes late holds the frame, and with it the game on every PC - with a delay of d frames and a
+// round trip of R the game makes d / R frames a second at most (2 frames over 50 ms: 40 a second for
+// everybody). The delay of the session's start is a guess from the first pings. Each client keeps its
+// own by what the host tells it every second: how many frames ahead of need its inputs came.
+std::atomic<uint32_t> g_game_frame{0};  // the frame the game thread asked for last (frame_input)
+std::atomic<uint32_t> g_delay_now{0};   // client: its own delay now (0: the session's, g_delay)
+uint32_t g_submitted = 0;               // client: the newest frame an input of ours was made for
+double g_wait_acc = 0;                  // client: ms our frames waited for the host's since the last roster
+int g_delay_calm = 0;                   // client: rosters in a row with the inputs well ahead
+uint32_t g_sync_frames = 0;             // client: frames played in step since coming in
+constexpr uint32_t kMaxDelay = 12;
+
+void adapt_delay(int lead) {  // client, g_mu held: the host's roster came
+  const uint32_t base = std::max<uint32_t>(1, g_delay), now = g_delay_now.load() ? g_delay_now.load() : base;
+  uint32_t want = now;
+  double waited = g_wait_acc;
+  g_wait_acc = 0;
+  if (lead == 127 || (g_late && !g_late_in) || g_fast || g_hurry) {
+    g_delay_calm = 0;
+    return;
+  }
+  // (A game that does not wait for the host's frames is held by its own PC, not by the network: more
+  // delay would only make its controls slower.)
+  if (lead <= 0) {
+    if (waited >= 50) want = now + 2;
+    g_delay_calm = 0;
+  } else if (lead == 1) {
+    if (waited >= 50) want = now + 1;
+    g_delay_calm = 0;
+  } else if (lead >= 4) {  // (well ahead for five seconds: one frame less, three stay in hand)
+    if (++g_delay_calm >= 5) {
+      want = now - 1;
+      g_delay_calm = 0;
+    }
+  } else {
+    g_delay_calm = 0;
+  }
+  want = std::max(base, std::min(kMaxDelay, want));
+  if (want == now) return;
+  g_delay_now = want;
+  LOGI("net: own input delay %u -> %u frames (our inputs came %d frame(s) ahead of the host's need, our frames waited %.0f ms)",
+       now, want, lead, waited);
+}
+
 // Client: a desync of our game restarts it into the same session (it replays the session and
-// catches up), at most kMaxResyncs times in a row (-tmnt2net-resync=N counts them).
-constexpr int kMaxResyncs = 2;
+// catches up), at most kMaxResyncs times in a row (-tmnt2net-resync=N counts them; two minutes in
+// step and the count begins anew). If that does not help, the game leaves the session: it does not
+// play on in a game of its own.
+constexpr int kMaxResyncs = 4;
 int g_resyncs = 0;
 std::atomic<bool> g_restart_rejoin{false};
 // The network page's lobby in a game alone (no session in this process): the host's start
@@ -317,6 +367,8 @@ void send_roster() {
     if (g_pl[p].ready) r.ready |= (uint8_t)(1u << p);
     tmnp::put_str(r.names[p], g_pl[p].name.c_str());
     r.ping_ms[p] = (uint16_t)std::min<uint32_t>(g_pl[p].ping, 65535);
+    r.lead[p] = (int8_t)std::max(-128, std::min(127, g_pl[p].lead_min));
+    g_pl[p].lead_min = 127;
   }
   r.started = g_phase == Phase::Playing ? 1 : 0;
   r.waiting = g_waiting;
@@ -723,6 +775,13 @@ void host_data(transport::ITransport* t, const PeerId& peer, const std::vector<u
         g_in[p][in.frame % kRing].in = in;
         newest = std::max(newest, in.frame);
       }
+      if (newest > g_pl[p].newest_in) {
+        if (!g_pl[p].late && !g_pl[p].out_from && g_phase == Phase::Playing) {
+          int lead = (int)newest - (int)g_game_frame.load();
+          if (lead < g_pl[p].lead_min) g_pl[p].lead_min = lead;
+        }
+        g_pl[p].newest_in = newest;
+      }
       // A player who replayed the running game is in once their input reaches the newest frame:
       // their pad is there from that frame on, the same frame on every PC.
       if (g_pl[p].late && g_phase == Phase::Playing && newest > g_next_bundle) {
@@ -797,6 +856,7 @@ void client_data(transport::ITransport*, const PeerId& peer, const std::vector<u
         g_pl[p].ping = r.ping_ms[p];
       }
       g_waiting = r.waiting;
+      if (g_phase == Phase::Playing && g_me >= 0 && g_me < kMax) adapt_delay(r.lead[g_me]);
       break;
     }
     case tmnp::PT_Record: {
@@ -857,6 +917,8 @@ void client_data(transport::ITransport*, const PeerId& peer, const std::vector<u
       tmnp::StartPacket s;
       std::memcpy(&s, d.data(), sizeof(s));
       g_delay = s.input_delay;
+      g_delay_now = 0;
+      g_submitted = 0;
       g_players = s.players;
       g_phase = Phase::Playing;
       g_active = !g_cfg.session_at_title;  // (in a running game: once it begins here, at the title menu)
@@ -904,9 +966,13 @@ void client_data(transport::ITransport*, const PeerId& peer, const std::vector<u
                             L"): игра перезапускается и догонит остальных.",
                         8.0, 0xFFFFD040);
       } else {
-        overlay::notify(L"Рассинхронизация (кадр " + std::to_wstring(dp.frame) +
-                            L") снова: игра у игроков идёт по-разному. Начните сессию заново.",
-                        12.0, 0xFFFF6060);
+        // Re-entries did not help: this PC computes another game than the others (the logs of every
+        // try are kept). It leaves the session - a player does not play on in a game of their own.
+        LOGE("net: %d re-entries did not help: leaving the session", g_resyncs);
+        g_error = "Игра на этом ПК идёт иначе, чем у остальных, и перезаходы не помогли: вы вышли из сессии.";
+        g_phase = Phase::Ended;
+        g_cancel_request = true;  // (the network thread says goodbye to the host at once)
+        g_cv.notify_all();
       }
       break;
     }
@@ -1553,6 +1619,12 @@ void reset_lobby_state() {
   g_players = 1;
   g_start_request = false;
   g_rec_have = false;
+  g_game_frame = 0;
+  g_delay_now = 0;
+  g_submitted = 0;
+  g_wait_acc = 0;
+  g_delay_calm = 0;
+  g_sync_frames = 0;
   for (Player& p : g_pl) p = Player{};
   g_me = 0;
   g_note.clear();
@@ -1634,11 +1706,15 @@ void prepare(Config& cfg) {
   // was another one than everybody else's, and its game parted from the others a moment after a stage
   // began (0.14 - 0.16.5). The choice is the shape of the frame now (cfg.shape, video.cpp).
   cfg.aspect = Config::Aspect::Wide;
+  // And no exclusive fullscreen: there the game stops while its window is not in front (Alt+Tab), every
+  // PC of a session waits for it, and after the device comes back its frames are drawn late - drawn
+  // effects take random numbers, so that game would part from the others. The whole monitor without a
+  // frame is the same picture and keeps running. (The old start into a session did this already.)
+  if (cfg.mode == "fullscreen") cfg.mode = "borderless";
   if (cfg.timeout_ms < 2000) cfg.timeout_ms = 2000;
   if (!cfg.net_on()) return;
   cfg.shape = Config::Aspect::Wide;  // (the old start into a session: the monitor's shape)
   cfg.aspect = Config::Aspect::Wide;
-  if (cfg.mode == "fullscreen") cfg.mode = "borderless";
 }
 
 void install(const Config& cfg) {
@@ -2017,9 +2093,9 @@ void lobby() {
   stop();
 }
 
+// The game thread's input of this frame goes to a later one: `frame` is the frame being played.
 void submit(uint32_t frame, const sim::PadInput& pad, uint16_t movie, uint8_t flags) {
   tmnp::InputWire in{};
-  in.frame = frame;
   in.pad.buttons = pad.buttons;
   in.pad.dpad = pad.dpad;
   in.pad.connected = 1;
@@ -2031,13 +2107,24 @@ void submit(uint32_t frame, const sim::PadInput& pad, uint16_t movie, uint8_t fl
   in.flags = flags;
   std::lock_guard<std::mutex> lk(g_mu);
   if (g_role == Role::Host) {
-    g_in[0][frame % kRing].frame = frame;
-    g_in[0][frame % kRing].in = in;  // the network thread builds and sends the bundle
-  } else {
+    in.frame = frame + g_delay;
+    g_in[0][in.frame % kRing].frame = in.frame;
+    g_in[0][in.frame % kRing].in = in;  // the network thread builds and sends the bundle
+    return;
+  }
+  // A client's delay is its own and changes (adapt_delay). Every frame gets exactly one input, in order:
+  // when the delay grows the frames between get this input too; when it shrinks this sample is left
+  // out (its frame has one already).
+  uint32_t d = g_delay_now.load();
+  uint32_t want = frame + (d ? d : g_delay);
+  if (!g_submitted || want > g_submitted + 60 || want + 60 < g_submitted) g_submitted = want - 1;  // (a session's first)
+  for (uint32_t f = g_submitted + 1; f <= want; ++f) {
+    in.frame = f;
     g_mine.push_back(in);
-    while (g_mine.size() > tmnp::kHistory) g_mine.pop_front();
     g_mine_new = true;
   }
+  if (want > g_submitted) g_submitted = want;
+  while (g_mine.size() > tmnp::kHistory) g_mine.pop_front();
 }
 
 // A replayed session is not heard: its sounds, played ten and more times as fast, are noise. The game's
@@ -2126,6 +2213,7 @@ void slow_report(uint32_t frame) {  // (g_mu not held)
 }
 
 bool frame_input(uint32_t frame, sim::FrameInput* out) {
+  g_game_frame = frame;
   if (g_restart_rejoin.exchange(false)) restart_rejoin();
   ULONGLONG start = GetTickCount64(), last_present = 0;
   bool shown = false;
@@ -2185,6 +2273,7 @@ bool frame_input(uint32_t frame, sim::FrameInput* out) {
   {
     double w = slow_ms(wait0, wait1);
     g_slow.waited += w;
+    if (g_role == Role::Client) g_wait_acc += w;
     for (int p = 1; p < kMax; ++p)
       if ((missing >> p) & 1) g_slow.by[p] += w;
   }
@@ -2208,6 +2297,13 @@ bool frame_input(uint32_t frame, sim::FrameInput* out) {
   }
   bool hurry = boot || (g_late && !g_late_in) || left_out;
   g_hurry = hurry;
+  if (g_role == Role::Client) {  // two minutes in step: an earlier desync is behind us
+    if (hurry) g_sync_frames = 0;
+    else if (++g_sync_frames == 7200 && g_resyncs > 0) {
+      LOGI("net: in step with the others for two minutes: the earlier desync is behind");
+      g_resyncs = 0;
+    }
+  }
   bool fast = boot || (hurry && g_newest > frame + 30);
   uint32_t newest = g_newest;
   lk.unlock();

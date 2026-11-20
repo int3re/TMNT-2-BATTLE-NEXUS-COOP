@@ -278,7 +278,7 @@ bool net_input(FrameInput& in) {
     if (pad.buttons || pad.dpad) pad = PadInput{};
     else g_hold_buttons = false;
   }
-  netplay::submit(g_frame + netplay::input_delay(), pad, mine.movie, mine.flags);
+  netplay::submit(g_frame, pad, mine.movie, mine.flags);  // (for a later frame: the input delay)
   if (netplay::frame_input(g_frame, &in)) return true;
   g_solo_slot = netplay::my_player();
   return false;
