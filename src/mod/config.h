@@ -14,6 +14,11 @@ struct Config {
   // stretch: the 4:3 picture stretched over the frame.
   enum class Aspect { Wide, Classic, Stretch };
   Aspect aspect = Aspect::Wide;
+  // The picture's shape as the player chose it ([video] aspect). A game is always ready for a network
+  // session, and there the cameras are a part of the game's logic, the same on every PC: `aspect` is then
+  // auto whatever was chosen (netplay::prepare), and 4:3 / stretch are only how the frame is shaped and
+  // shown (video.cpp): a 4:3 frame with bars, or the 4:3 frame stretched over the window.
+  Aspect shape = Aspect::Wide;
   bool hud_center = true;           // hud = center | stretch (aspect = auto)
   bool own_camera = true;           // own_camera = 1: in a network game the stage camera follows this PC's player
   float camera_zoom = 1.0f;         // the mouse wheel's zoom of the stage camera (0.5 closer .. 2.5 farther)
@@ -99,6 +104,9 @@ struct Config {
   int clear_test_stages = 0;     // clear_test: only this many stages (0 = every one; e.g. 1 = not the boss after)
   bool all_costumes = false;     // character select: every costume can be picked (test runs)
   bool replay_draws = false;     // [debug] a replayed session is drawn and shown, as before 0.16.5
+  int fpu_test = 0;              // [debug] 53 | 64: every frame ends with the thread at that x87 precision (as an
+                                 // overlay or a capture hooked into the frame might leave it)
+  bool fpu_keep = false;         // [debug] the thread's arithmetic is not put back at a frame's start (before 0.16.6)
   bool keyboard_lab = false;     // the keyboard at DirectInput's background level (a test copy is never in front)
   bool all_characters = false;   // Casey, Splinter, Karai and Slashuur count as unlocked (test runs)
   int map_area = 0;              // > 0: the area map opens on this area (2 = 0-2, 3 = Home; test runs)

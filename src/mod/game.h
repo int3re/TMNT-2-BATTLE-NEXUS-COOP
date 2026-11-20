@@ -115,6 +115,15 @@ constexpr uint8_t kSoundOptionApplyHead[] = {0x56, 0x8B, 0xF1, 0x8B, 0x06, 0x85,
 constexpr uintptr_t kSoundVolume[3] = {0x51B0D0, 0x51B090, 0x51B110};
 constexpr uint8_t kSoundVolumeHead[] = {0x8B, 0x44, 0x24, 0x04, 0x85, 0xC0, 0x7D, 0x10, 0x33, 0xC0};
 
+// --- the players' move boundary (GameProperty.cpp) -----------------------------------------------------
+// CGameProperty::AdjustWithinMoveBoundary 0x48CE90 (bool __cdecl(RwV3d* out, const RwV3d* in); called by
+// CPlayerCharacter::CalcVelocityPerFrame for every player's step): with two players or more nobody steps
+// out of a circle around the stage camera's look-at point - the middle of the team; its radius is the
+// camera's view area ([camera + 0x3C], 3 at least). One screen holds the whole team that way.
+constexpr uintptr_t kMoveBoundary = 0x48CE90;
+constexpr uint8_t kMoveBoundaryHead[] = {0xA1, 0xB8, 0x48, 0x6D, 0x00, 0x83, 0xEC, 0x1C,
+                                         0x56, 0x8B, 0x70, 0x1C, 0x85, 0xF6, 0x0F, 0x84};
+
 // --- the pause menu --------------------------------------------------------------------------------
 // CGameStage::CheckPauseMenu 0x48DBF0 (__thiscall, no arguments; three stage sequences ask it every
 // frame the stage is not paused): on the PC it is CPCSpecific::IsKeyTrigger(DIK_ESCAPE) - the Esc KEY,

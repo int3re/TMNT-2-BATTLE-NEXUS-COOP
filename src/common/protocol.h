@@ -16,6 +16,8 @@
 // 6 = 0.10.0, a guarding teammate wakes a sleeping player (the game goes another way than 0.9).
 // 7 = 0.12.0, a player who joins a running game gets a turtle of the team at once (midjoin.cpp).
 // 8 = 0.12.2, Hello.player_id: a player back after a drop is known by it (or a Steam id), any name.
+// 9 = 0.13.0, 10 = 0.14.0 (sessions in a running game), 11 = 0.16.0 (costumes), 12 = 0.16.3 (every hero),
+// 13 = 0.16.4 (pause in a session), 14 = 0.16.6 (no move boundary between the players of a session).
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +26,7 @@
 namespace tmnp {
 
 constexpr uint32_t kMagic = 0x504E3254;  // bytes 'T','2','N','P'
-constexpr uint16_t kVersion = 13;
+constexpr uint16_t kVersion = 14;
 constexpr uint16_t kDefaultPort = 7790;  // TMNT1's tmntnet uses 7777
 constexpr int kMaxPlayers = 4;
 constexpr int kHistory = 8;  // frames repeated in every input / bundle packet

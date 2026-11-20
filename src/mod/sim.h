@@ -58,6 +58,10 @@ bool starting_up();
 void title_menu_reached();  // the title's menu is up: the start-up is over (game thread)
 void run_to_title_menu();   // the title's opening again at once to its menu (a session waits there)
 void dump_data(int n);      // [debug] the game's data objects to files
+// The game thread's arithmetic (x87 control word, MXCSR) as the game's own, whatever other code left it:
+// at every frame's start and where its drawing begins (game thread).
+void arithmetic();
+void keep_logs(const wchar_t* tag);  // a desync: tmnt2net.log and the frame log copied to tmnt2net-desync-<tag>*.log
 
 // What the game's devices report this frame (only while active()).
 void keyboard(uint8_t keys[256]);

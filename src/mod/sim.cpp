@@ -5,6 +5,8 @@
 #include <dinput.h>
 #include <dinput.h>
 
+#include <xmmintrin.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -356,11 +358,58 @@ void next_input() {
   g_cur = in;
 }
 
+// --- the arithmetic of the game's thread --------------------------------------------------
+// Direct3D leaves the thread that made the device at single precision, round to nearest (x87 control
+// word 007F), and all of the game's arithmetic runs so. Other code in the process - an overlay, a screen
+// capture, a driver's helper: anything hooked into the frame's end - can leave another precision or
+// rounding mode behind, and from then on this PC computes other numbers than the others do: a few frames
+// later it plays another game (a session parted for one player only, again after every restart).
+// Every frame begins with the same state on every PC; a change is logged and undone.
+// (SSE: RenderWare's start switches flush-to-zero on, 0x554A87; rounding to nearest, denormals as they are.)
+constexpr uint16_t kX87Bits = 0x0F00;  // precision (bits 8-9: 00 = 24 bits), rounding (10-11: 00 = nearest)
+constexpr uint32_t kSseBits = 0xE040;  // rounding (13-14), flush to zero (15), denormals are zero (6)
+constexpr uint32_t kSseWant = 0x8000;  // of those: flush to zero on
+
+uint16_t x87_control() {
+  uint16_t cw = 0;
+  __asm fnstcw cw
+  return cw;
+}
+void x87_control(uint16_t cw) { __asm fldcw cw }
+
+void fpu_frame() {
+  if (g_cfg.fpu_test == 53 || g_cfg.fpu_test == 64)  // [debug] what a foreign hook might leave behind
+    x87_control((uint16_t)((x87_control() & ~0x0300) | (g_cfg.fpu_test == 53 ? 0x0200 : 0x0300)));
+  uint16_t cw = x87_control();
+  uint32_t csr = _mm_getcsr();
+  static bool first = true;
+  static unsigned changes = 0;
+  if (first) {
+    first = false;
+    LOGI("sim: the game thread's arithmetic: x87 control word %04X, MXCSR %04X%s", (unsigned)cw, (unsigned)csr,
+         (cw & kX87Bits) || (csr & kSseBits) != kSseWant ? " - not the game's own (single precision, round to nearest)" : "");
+  }
+  if (!(cw & kX87Bits) && (csr & kSseBits) == kSseWant) return;
+  if (++changes <= 3 || changes % 3600 == 0)
+    LOGW("sim: frame %u: other code left the game thread's arithmetic changed (x87 %04X, MXCSR %04X); %s (%u times)",
+         g_frame, (unsigned)cw, (unsigned)csr, g_cfg.fpu_keep ? "[debug] left so" : "put back", changes);
+  if (g_cfg.fpu_keep) return;
+  x87_control((uint16_t)(cw & ~kX87Bits));
+  _mm_setcsr((csr & ~kSseBits) | kSseWant);
+}
+
+}  // namespace
+
+void arithmetic() { fpu_frame(); }
+
+namespace {
+
 // --- the frame ------------------------------------------------------------------------
 using InputsSync_t = void(__fastcall*)(void* self, void* edx);
 const InputsSync_t oInputsSync = reinterpret_cast<InputsSync_t>(game::kInputsSync);
 
 void __fastcall hkInputsSync(void* self, void* edx) {
+  fpu_frame();
   // The frame that just ran (logic + drawing) ends here. One line a frame of a network session (or of
   // a test run's recording / replay or the old start from frame 1), none while playing alone.
   bool logging = g_log && (netplay::active() || !g_cfg.session_at_title || g_rec || g_play != INVALID_HANDLE_VALUE);
@@ -450,6 +499,19 @@ void keyboard(uint8_t keys[256]) {
 const PadInput& pad(int slot) {
   static const PadInput kNone;
   return slot >= 0 && slot < kPads ? g_cur.pads[slot] : kNone;
+}
+
+// A desync: this game's two logs as they are now, kept beside the game under another name (the game may
+// restart at once and begin them anew). Comparing the frame logs of the two PCs shows the first frame
+// they part at.
+void keep_logs(const wchar_t* tag) {
+  if (g_log) fflush(g_log);
+  std::wstring dir = module_dir();
+  for (const wchar_t* name : {L"tmnt2net-sim.log", L"tmnt2net.log"}) {
+    std::wstring from = dir + name, to = dir + L"tmnt2net-desync-" + tag + (name[8] == L'-' ? L"-sim.log" : L".log");
+    if (!CopyFileW(from.c_str(), to.c_str(), FALSE)) LOGW("sim: %ls not kept (error %lu)", name, GetLastError());
+  }
+  LOGI("sim: this game's logs at the desync are kept as tmnt2net-desync-%ls.log and tmnt2net-desync-%ls-sim.log", tag, tag);
 }
 
 void install(const Config& cfg) {

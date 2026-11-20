@@ -153,9 +153,10 @@ void choose_sizes() {
   }
   LOGI("video: monitor %dx%d, TMNT2.ini asks %dx%dx%d, mode %s, aspect %s", mon_w, mon_h, game_w, game_h,
        read_int(game::kScreenDepth), mode_name(g_mode),
-       g_cfg.aspect == Config::Aspect::Wide ? "auto (widescreen)" : g_cfg.aspect == Config::Aspect::Classic ? "4:3" : "stretch");
-  bool wide_frame = g_cfg.aspect != Config::Aspect::Classic;  // the frame takes the monitor's shape
-  if (g_cfg.net_aspect > 0) wide_frame = true;  // netplay: a frame of the session's aspect (below)
+       g_cfg.shape == Config::Aspect::Wide ? "auto (widescreen)" : g_cfg.shape == Config::Aspect::Classic ? "4:3" : "stretch");
+  // auto: the frame takes the monitor's shape; 4:3 and stretch: a 4:3 frame (shown with bars / stretched
+  // over the window at Present). The cameras are the same in all three (the game's logic).
+  bool wide_frame = g_cfg.shape == Config::Aspect::Wide;
 
   if (g_mode == Mode::Fullscreen) {
     std::vector<SIZE> modes = display_modes();
@@ -952,7 +953,7 @@ HRESULT WINAPI hkPresent(IDirect3DDevice9* dev, const RECT* src, const RECT* dst
   input::on_frame();
   int tag = g_shot_tag.exchange(-1);
   if (tag >= 0) save_shot(dev, (unsigned)tag, L"\\tmnt2net_t%05u.bmp");
-  if (windowed() && g_copy && !dst) {
+  if (windowed() && g_copy && !dst && g_cfg.shape != Config::Aspect::Stretch) {  // (stretch: over the whole window)
     HWND hwnd = wnd ? wnd : g_hwnd.load();
     if (hwnd && !IsIconic(hwnd))
       if (const RECT* d = fit(hwnd)) dst = d;
@@ -1033,7 +1034,7 @@ bool set_resolution(int w, int h) {
     HWND hwnd = g_hwnd.load();
     MONITORINFO mi = hwnd ? monitor_of(hwnd) : primary_monitor();
     int mon_w = mi.rcMonitor.right - mi.rcMonitor.left, mon_h = mi.rcMonitor.bottom - mi.rcMonitor.top;
-    bool wide_frame = g_cfg.aspect != Config::Aspect::Classic || g_cfg.net_aspect > 0;
+    bool wide_frame = g_cfg.shape == Config::Aspect::Wide;
     if (g_mode == Mode::Windowed) {
       w = g_cfg.window_w;
       h = g_cfg.window_h;

@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.16.5" src="https://img.shields.io/badge/version-0.16.5-2ea44f">
+  <img alt="version 0.16.6" src="https://img.shields.io/badge/version-0.16.6-2ea44f">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="1–4 players" src="https://img.shields.io/badge/players-1–4-f59e0b">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/network-Steam%20·%20LAN%20·%20IP-1b2838">
@@ -51,6 +51,7 @@ The same kind of mod for the first game of the series, *TMNT* (2003):
 | **Starting on Windows 10/11** | "Unkown Error", the game does not start | starts |
 | **Co-op** | up to 4 players on one PC | the same over the network: Steam, LAN, IP |
 | **Camera** | one for everybody | one of your own in a network game |
+| **Distance between players** | nobody leaves the shared screen | go as far apart as you like in a network game |
 | **Health** | one bar for the team | one for each player; teammates can be woken |
 | **Costumes and heroes** | unlocked as you play | all unlocked, picked with the arrows |
 | **Widescreen** | a stretched 4:3 frame | a wider view in the right proportions |
@@ -115,6 +116,8 @@ Everything is set up inside the game, in its own font and style.
 
 - **A camera of your own.** It follows your hero and the screen is never split. Teammates beyond the edge of
   the screen are shown by their name and an arrow.
+- **Go your own way.** The original never lets players further apart than the shared screen; in a network
+  game there is no such limit.
 - **Player names** over the heroes, at character select and in the results.
 - **Health of your own.** In the original the whole team shares one health bar. A player who goes down falls
   asleep and gets up after 10 seconds; a teammate can wake them sooner.
@@ -223,7 +226,7 @@ The detailed pages are in Russian.
 
 ## Versions and compatibility
 
-The current version is **0.16.5**; it is shown under the game's title menu.
+The current version is **0.16.6**; it is shown under the game's title menu.
 
 In a network game everyone needs a compatible version of the mod: the game must run identically on every PC,
 so any change to how it plays also changes the protocol version. The host refuses a player with an
@@ -231,6 +234,7 @@ incompatible version and says why.
 
 | Mod versions | Play together |
 |---|---|
+| 0.16.6 | with 0.16.6 only |
 | 0.16.4 – 0.16.5 | yes |
 | 0.16.3 | with 0.16.3 only |
 | 0.16.0 – 0.16.2 | yes |

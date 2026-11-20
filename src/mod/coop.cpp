@@ -42,6 +42,9 @@ int& field(uint8_t* pl, int off) { return *reinterpret_cast<int*>(pl + off); }
 // reads when a hero is picked and when it draws the icons), written again after every Move: the same
 // on every PC of a network game, and after a join in mid-game, from the same buttons.
 bool g_costumes = false;
+// The controller of each panel while its player is in (-1: nobody yet). Panel i is the game's controller
+// i: the i-th player to press Start - in a network game whichever PC that was, not network player i.
+int g_select_ctrl[4] = {-1, -1, -1, -1};
 struct SelectLook {
   int rows = 1;         // rows of picks in the player's panel (the picks made and the one being made)
   bool shown = false;   // the player may still pick: the name of the look is drawn
@@ -104,6 +107,15 @@ void __fastcall hkSelectMove(uint8_t* self, void* edx) {
       g_look[p].shown = field(pl, game::kSelState) == 1 && field(pl, game::kSelPicked) < field(pl, game::kSelMax);
     }
   }
+  for (int p = 0; p < 4; ++p) {
+    uint8_t* pl = player(self, p);
+    int ctrl = field(pl, game::kSelState) == 1 ? (int)*reinterpret_cast<int16_t*>(pl) : -1;
+    if (ctrl != g_select_ctrl[p] && ctrl >= 0 && netplay::active()) {
+      int port = (int)(int16_t)reinterpret_cast<int(__cdecl*)(int)>(game::kGetPhysicalPort)(ctrl);
+      LOGI("character select: panel %d is network player %d (controller %d)", p + 1, port + 1, ctrl);
+    }
+    g_select_ctrl[p] = ctrl;
+  }
   if (!g_select_seen) {
     static uint32_t last = 0;
     if (sim::frame() > last + 60) LOGI("character select (frame %u)", sim::frame());
@@ -136,6 +148,21 @@ void __fastcall hkSelectMove(uint8_t* self, void* edx) {
       }
     }
   }
+}
+
+// --- the team's leash ---------------------------------------------------------------------------
+// The game keeps every player inside a circle around the stage camera's look-at point, the middle of
+// the team: one screen has to hold everybody. In a network game every player has a screen and a camera
+// of their own, and the circle only drags the players to each other "like a magnet": whoever walks away
+// pulls the others along and is pulled back. In a session there is no circle (a part of the game's
+// logic: the same on every PC); in a game on one screen it stays.
+using MoveBoundary_t = bool(__cdecl*)(float* out, const float* in);
+MoveBoundary_t oMoveBoundary = nullptr;
+
+bool __cdecl hkMoveBoundary(float* out, const float* in) {
+  if (!netplay::active()) return oMoveBoundary(out, in);
+  if (out != in) std::memcpy(out, in, 3 * sizeof(float));
+  return false;
 }
 
 // --- area map: a turtle icon per player (CAreaWorkPool::KameIconDisp) ------------------------
@@ -236,8 +263,11 @@ int __cdecl tag_quad(int prim, void* vertices, int count) {
   return 1;
 }
 
-// Character select: each player's name in the lower, empty part of their panel. Panel i is the
-// game's controller i, which in a network game is network player i (pad i).
+std::string tag_name(int n);
+
+// Character select: each player's name in the lower, empty part of their panel. Panel i is the game's
+// controller i, the i-th player who pressed Start: in a network game the name of the player whose pad
+// that controller is (as over the heroes in a stage), and no name under a panel nobody has taken yet.
 void draw_select_names() {
   if (!g_select_seen) return;
   g_select_seen = false;
@@ -246,7 +276,7 @@ void draw_select_names() {
   const float y = 78.0f, kMaxW = 128.0f;  // a panel's inner width
   bool begun = false;
   for (int i = 0; i < 4; ++i) {
-    std::string name = netplay::active() ? netplay::player_name(i)
+    std::string name = netplay::active() ? (g_select_ctrl[i] >= 0 ? tag_name(g_select_ctrl[i]) : std::string())
                                          : i < (int)g_test_names.size() ? g_test_names[i] : std::string();
     if (name.empty()) continue;
     std::wstring w = gamefont::name(wide_name(name));
@@ -647,6 +677,11 @@ void install(const Config& cfg) {
   if (patch::bytes_are(game::kKameIconDisp, game::kKameIconDispHead, sizeof(game::kKameIconDispHead)))
     patch::hook("area map: a turtle per player", game::kKameIconDisp, (void*)&hkKameIcon, (void**)&oKameIcon);
   install_dance();
+  if (patch::bytes_are(game::kMoveBoundary, game::kMoveBoundaryHead, sizeof(game::kMoveBoundaryHead)))
+    patch::hook("network game: the players are not held together (no move boundary)", game::kMoveBoundary,
+                (void*)&hkMoveBoundary, (void**)&oMoveBoundary);
+  else
+    LOGW("coop: move boundary not recognised: the players are held together as in the game");
   if (patch::bytes_are(game::kCameraChangeMove, game::kCameraChangeMoveHead, sizeof(game::kCameraChangeMoveHead)))
     patch::hook("in-stage transitions: the whole team jumps", game::kCameraChangeMove, (void*)&hkCameraChangeMove,
                 (void**)&oCameraChangeMove);

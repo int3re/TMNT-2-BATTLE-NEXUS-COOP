@@ -85,6 +85,7 @@ bool load_config(const std::wstring& path, Config& cfg) {
   if (v == "auto" || v == "wide" || v == "hor+") cfg.aspect = Config::Aspect::Wide;
   if (v == "4:3") cfg.aspect = Config::Aspect::Classic;
   if (v == "stretch") cfg.aspect = Config::Aspect::Stretch;
+  cfg.shape = cfg.aspect;
   v = get(path, L"video", L"hud");
   if (v == "center") cfg.hud_center = true;
   if (v == "stretch") cfg.hud_center = false;
@@ -214,6 +215,9 @@ bool load_config(const std::wstring& path, Config& cfg) {
   get_bool(path, L"debug", L"all_costumes", cfg.all_costumes);
   get_bool(path, L"debug", L"keyboard_lab", cfg.keyboard_lab);
   get_bool(path, L"debug", L"replay_draws", cfg.replay_draws);
+  get_bool(path, L"debug", L"fpu_keep", cfg.fpu_keep);
+  v = get(path, L"debug", L"fpu_test");
+  if (!v.empty()) cfg.fpu_test = atoi(v.c_str());
   get_bool(path, L"debug", L"all_characters", cfg.all_characters);
   get_bool(path, L"debug", L"log_cameras", cfg.log_cameras);
   get_bool(path, L"debug", L"postfx_split", cfg.postfx_split);

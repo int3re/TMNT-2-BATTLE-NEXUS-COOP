@@ -571,6 +571,7 @@ void compare_hash(int p, uint32_t frame) {
   g_pl[p].desync = true;
   LOGE("net: DESYNC at frame %u: host %u calls %08x, P%d (%s) %u calls %08x", frame, mine.calls, mine.hash, p + 1,
        g_pl[p].name.c_str(), theirs.calls, theirs.hash);
+  sim::keep_logs(L"host");
   tmnp::DesyncPacket d{};
   d.frame = frame;
   d.player = (uint8_t)p;
@@ -675,6 +676,7 @@ void host_data(transport::ITransport* t, const PeerId& peer, const std::vector<u
       }
       Player& pl = g_pl[p];
       pl = Player{};
+      for (HSlot& s : g_hash[p]) s = HSlot{};  // (what the player in this place reported before is not theirs)
       pl.present = true;
       pl.name = name;
       pl.peer = peer;
@@ -892,6 +894,7 @@ void client_data(transport::ITransport*, const PeerId& peer, const std::vector<u
       tmnp::DesyncPacket dp;
       std::memcpy(&dp, d.data(), sizeof(dp));
       LOGE("net: DESYNC reported by the host at frame %u (P%d)", dp.frame, dp.player + 1);
+      if (dp.player == g_me) sim::keep_logs(g_resyncs == 0 ? L"client" : g_resyncs == 1 ? L"client-2" : L"client-3");
       if (dp.player != g_me) {
         overlay::notify(L"Р" + std::to_wstring(dp.player + 1) + L": рассинхронизация, его игра перезапустится.", 6.0,
                         0xFFFFD040);
@@ -1521,6 +1524,35 @@ void make_player_id() {
 
 void reset_lobby_state() {
   std::lock_guard<std::mutex> lk(g_mu);
+  // A game takes part in session after session without a restart (0.14): nothing of the session before may
+  // be left. Its frames were: a game that had played found the old session's frame N under the new one's
+  // number N and played that at once, without waiting for the host - another game than everybody else's
+  // from the first frames (0.14 - 0.16.5: "desync" for whoever had already played since their game's start).
+  for (auto& row : g_in)
+    for (InSlot& s : row) s = InSlot{};
+  for (BSlot& s : g_bundle) s = BSlot{};
+  g_next_bundle = 1;
+  g_all.clear();
+  g_newest = 0;
+  g_fast = false;
+  g_hurry = false;
+  g_boot = false;
+  g_boot_press = 0;
+  g_boot_last = 0;
+  g_reliable_sent = 0;
+  g_sent_bundle = 0;
+  g_hist_end = 0;
+  g_late_in = false;
+  g_mine.clear();
+  g_mine_new = false;
+  for (auto& row : g_hash)
+    for (HSlot& s : row) s = HSlot{};
+  g_hash_out.clear();
+  g_waiting = 0;
+  g_slow_mask = 0;
+  g_players = 1;
+  g_start_request = false;
+  g_rec_have = false;
   for (Player& p : g_pl) p = Player{};
   g_me = 0;
   g_note.clear();
@@ -1597,8 +1629,14 @@ void prepare(Config& cfg) {
   cfg.net_aspect = 16.0f / 9.0f;  // the camera is logic: one aspect for every PC
   cfg.view_fov = cfg.fov;         // the player's own wide angle: for the draw only (camera.cpp)
   cfg.fov = 1.0f;
+  // The cameras of every game that may be in a session are the session's, whatever picture the player
+  // chose: with [video] aspect = 4:3 or stretch the widescreen code was off, the stage camera of that PC
+  // was another one than everybody else's, and its game parted from the others a moment after a stage
+  // began (0.14 - 0.16.5). The choice is the shape of the frame now (cfg.shape, video.cpp).
+  cfg.aspect = Config::Aspect::Wide;
   if (cfg.timeout_ms < 2000) cfg.timeout_ms = 2000;
   if (!cfg.net_on()) return;
+  cfg.shape = Config::Aspect::Wide;  // (the old start into a session: the monitor's shape)
   cfg.aspect = Config::Aspect::Wide;
   if (cfg.mode == "fullscreen") cfg.mode = "borderless";
 }

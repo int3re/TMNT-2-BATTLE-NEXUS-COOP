@@ -14,6 +14,7 @@
 #include "mod/health.h"
 #include "mod/netplay.h"
 #include "mod/patch.h"
+#include "mod/sim.h"
 #include "mod/video.h"
 #include "mod/widescreen.h"
 
@@ -350,6 +351,7 @@ struct FrameSwap {
 } g_frame_swap;
 
 bool __fastcall hkRenderBegin(uint8_t* dev, void* edx) {
+  sim::arithmetic();  // (drawn effects compute too)
   void* cam = dev ? patch::read<void*>(reinterpret_cast<uintptr_t>(dev) + game::kDeviceCamera) : nullptr;
   const uint8_t* c2d = patch::read<const uint8_t*>(game::k2DCamera);
   void* cam2d = c2d ? patch::read<void*>(reinterpret_cast<uintptr_t>(c2d) + game::kCameraRw) : nullptr;
