@@ -21,7 +21,7 @@
 namespace lz {
 
 constexpr int kW = 960, kH = 600;  // the window, in units of 1/96 inch
-constexpr wchar_t kLauncherVersion[] = L"1.3.0";
+constexpr wchar_t kLauncherVersion[] = L"1.3.1";
 constexpr wchar_t kRepoUrl[] = L"https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 constexpr wchar_t kRepoText[] = L"github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 

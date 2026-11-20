@@ -1,5 +1,6 @@
 // The launcher's picture: every screen of the design, drawn from the model. Sizes and colours are the
-// design's (a 960 x 600 window: header 48, body 508, footer 44).
+// design's (a 960 x 600 window: header 48, body 508, footer 44). The news sheet with its bandana is the
+// one of the first game's launcher, in this one's colours.
 #include <algorithm>
 #include <cmath>
 
@@ -53,9 +54,9 @@ const char kNunchaku[] = "M5 20l3-9M19 20l-3-9M8 11c0-6 8-6 8 0";
 const char kShellOuter[] = "M14 2l10.4 6v12L14 26 3.6 20V8Z";
 const char kShellInner[] = "M14 8.5l4.8 2.75v5.5L14 19.5l-4.8-2.75v-5.5Z";
 const char kShellLines[] = "M14 8.5V2M18.8 11.25L24.4 8M18.8 16.75L24.4 20M14 19.5V26M9.2 16.75L3.6 20M9.2 11.25L3.6 8";
-// stars: 20 x 20 and 12 x 12
-const char kShuriken[] = "M10 1l2.4 6.6L19 10l-6.6 2.4L10 19l-2.4-6.6L1 10l6.6-2.4Z";
-const char kStar[] = "M6 0.6l1.5 3.9L11.4 6 7.5 7.5 6 11.4 4.5 7.5 0.6 6l3.9-1.5Z";
+// a bandana's two loose ends, in a 56 x 32 box: they fly off to the right of the knot at 2, 12
+const char kBandanaLow[] = "M2 10L44 20l-7 3 6 7L2 17Z";
+const char kBandanaHigh[] = "M2 6l48-4-6 7 9 6L2 14Z";
 // the arena under the window's bottom edge, in a 960 x 110 box
 const char kPavilionRoof[] = "M18 34Q26 41 34 38Q40 35 43 28H81Q84 35 90 38Q98 41 106 34V37Q98 44 90 42H34Q26 44 18 37Z";
 const char kTorii[] = "M164 30Q200 24 236 30L234 37H166Z";
@@ -691,94 +692,103 @@ void downloading(Ctx& x, float top) {
          T(12), left, y, MUTED, note);
 }
 
-void banner(Ctx& x, const Vals& v) {
+// The news: a sheet of paper, a little askew, with its heading on a bandana tied at the sheet's top - the
+// band in the launcher's accent (the bandana the player chose), its two ends flying off to the right. Each
+// note is marked with a strip of a bandana, the four turtles' colours in turn. The sheet is as tall as
+// what it says.
+void paper(Ctx& x, const Vals& v) {
   Canvas& c = x.c;
   const Model& m = x.m;
-  const float L = 620, Tp = 70, R = 920, B = 468;
-  c.push(Matrix::Rotation(-1, D2D1::Point2F((L + R) / 2, Tp)));
-  auto cloth = [](float l, float t, float r, float b, float notch, D2D1_POINT_2F* p) {
-    p[0] = {l, t};
-    p[1] = {r, t};
-    p[2] = {r, b};
-    p[3] = {(l + r) / 2, b - notch};
-    p[4] = {l, b};
-  };
-  D2D1_POINT_2F p[5];
-  cloth(L + 8, Tp + 8, R + 8, B + 8, 28, p);
-  c.poly(p, 5, x.accent);
-  cloth(L, Tp, R, B, 28, p);
-  c.poly(p, 5, BLACK);
-  const float l = L + 3, t = Tp + 3, r = R - 3, b = B - 4;
-  cloth(l, t, r, b, 27, p);
-  c.poly(p, 5, PAPER);
-  c.clip_poly(p, 5);
-  for (int j = 0; j < 19; ++j)
-    for (int i = 0; i < 19; ++i) {
-      float px = r - 150 + 4 + 8 * i, py = b - 150 + 4 + 8 * j;
-      float d = std::sqrt((r - px) * (r - px) + (b - py) * (b - py)) / 212.0f;
-      float a = clamp01(1 - d / 0.72f);
-      if (a > 0.01f) c.ellipse(px, py, 1.6f, 1.6f, PINK, 0.2f * a);
-    }
-  c.fill(l, t, r - l, 38, x.accent);
-  c.fill(l, t + 35, r - l, 3, BLACK);
-  c.unclip();
-  c.text_mid(v.tab, D(12, 0.06f), l + 18, t + 6 + (35 - 6) / 2.0f, PINK);
-  c.icon(kShuriken, r - 14 - 18, t + 6 + (35 - 6) / 2.0f - 9, 18, PINK, 0, 20, true);
-  c.ellipse(r - 14 - 9, t + 6 + (35 - 6) / 2.0f, 1.8f, 1.8f, x.accent);
-  // the words
-  const float tx = l + 20, tw = (r - l) - 40;
-  float y = t + 38 + 14;
-  y += c.text(v.meta, Mo(12, 700), tx, y, 0x4A4466) + 10;
+  const float L = 620, W = 300, top = 48 + 26 + 30, limit = kH - 44 - 22;  // the sheet; its bottom goes no lower
+  const float tx = L + 3 + 20, tw = W - 2 * (3 + 20);
+  Font meta_f = Mo(12, 700), title_f = D(17), item_f = T(13), link_f = T(13, 700);
   TextOpt head;
   head.wrap = true;
   head.max_w = tw;
   head.line_h = 17 * 1.3f;
-  y += c.text(v.title, D(17), tx, y, PINK, head) + 10;
-  const float bottom = b - 40;
-  const float links_h = 2.0f + 6 + 30 + (v.copy ? 2.0f + 30 : 0.0f);
+  const float mark_w = 13, mark_gap = 9;
   TextOpt item;
   item.wrap = true;
-  item.max_w = tw - 11 - 9;
+  item.max_w = tw - mark_w - mark_gap;
   item.line_h = 13 * 1.45f;
-  for (const std::wstring& s : v.items) {
-    float h = c.measure(s, T(13), item).height;
-    if (y + h > bottom - links_h - 6) break;  // (a long list: what does not fit is on GitHub)
-    c.icon(kStar, tx, y + 4, 11, VIOLET, 0, 12, true);
-    c.push(Matrix::Scale(11.0f / 12, 11.0f / 12) * Matrix::Translation(tx, y + 4));
-    c.stroke_path(kStar, 1, BLACK);
-    c.pop();
-    c.text(s, T(13), tx + 11 + 9, y, PINK, item);
-    y += h + 9;
+  // how much of the list there is room for (a long list: what does not fit is on GitHub)
+  const float below = 12 + 2 + 10 + 28 + (v.copy ? 28.0f : 0.0f) + 14 + 3;  // the line, the links, the edge
+  float h = 3 + 30 + c.line_h(meta_f) + 12 + c.measure(v.title, title_f, head).height + 12;
+  size_t shown = 0;
+  for (; shown < v.items.size(); ++shown) {
+    const float ih = c.measure(v.items[shown], item_f, item).height + (shown ? 10.0f : 0.0f);
+    if (top + h + ih + below > limit) break;
+    h += ih;
   }
-  // the links, at the bottom
-  float ly = bottom - links_h;
-  c.dashed_h(tx, ly, tw, 2, 6, 5, PINK, 0.4f);
-  ly += 2 + 6;
-  Font lf = T(13, 700);
+  h += below;
+
+  c.push(Matrix::Rotation(1.2f, D2D1::Point2F(L + W / 2, top + h / 2)));
+  c.fill(L + 8, top + 8, W, h, x.accent);
+  c.box(L, top, W, h, PAPER, 3, BLACK);
+  // dots thickening to the sheet's lower right corner
+  const float r = L + W - 3, b = top + h - 3;
+  for (int j = 0; j < 17; ++j)
+    for (int i = 0; i < 17; ++i) {
+      const float px = r - 136 + 4 + 8 * i, py = b - 136 + 4 + 8 * j;
+      if (py < top + 6) continue;
+      const float d = std::sqrt((r - px) * (r - px) + (b - py) * (b - py)) / 198.0f;
+      const float al = clamp01(1 - d / 0.72f);
+      if (al > 0.01f) c.ellipse(px, py, 1.6f, 1.6f, PINK, 0.22f * al);
+    }
+  // the words
+  float y = top + 3 + 30;
+  y += c.text(v.meta, meta_f, tx, y, 0x4A4466) + 12;
+  y += c.text(v.title, title_f, tx, y, PINK, head) + 12;
+  for (size_t i = 0; i < shown; ++i) {
+    if (i) y += 10;
+    c.push(Matrix::Skew(-18, 0, D2D1::Point2F(tx + mark_w / 2, y + 9)));
+    c.box(tx, y + 5, mark_w, 8, kBandana[i & 3], 1.5f, BLACK);
+    c.pop();
+    y += c.text(v.items[i], item_f, tx + mark_w + mark_gap, y, PINK, item);
+  }
+  y += 12;
+  c.dashed_h(tx, y, tw, 2, 6, 5, PINK, 0.4f);
+  y += 2 + 10;
+  // the links
   TextOpt under;
   under.underline = true;
-  float lw = c.measure(v.link, lf).width;
+  float lw = c.measure(v.link, link_f).width;
   bool hover = m.hover == H_PaperLink;
-  c.text_mid(v.link, lf, tx, ly + 15, hover ? VIOLET : PINK, under);
-  c.icon(kExternal, tx + lw + 6, ly + 8, 14, hover ? VIOLET : PINK, 2.6f);
-  hit(x, H_PaperLink, tx, ly, lw + 6 + 14, 30);
+  c.text_mid(v.link, link_f, tx, y + 14, hover ? VIOLET : PINK, under);
+  c.icon(kExternal, tx + lw + 6, y + 7, 14, hover ? VIOLET : PINK, 2.6f);
+  hit(x, H_PaperLink, tx, y, lw + 6 + 14, 28);
   if (v.copy) {
-    ly += 30 + 2;
-    bool copied = m.copied_until != 0;
+    y += 28;
+    const bool copied = m.copied_until != 0;
     const wchar_t* label = copied ? L"Ссылка скопирована" : L"Скопировать ссылку для друзей";
-    float cw = c.measure(label, lf).width;
+    const float cw = c.measure(label, link_f).width;
     hover = m.hover == H_Copy;
-    c.text_mid(label, lf, tx, ly + 15, hover ? VIOLET : PINK, under);
-    c.icon(copied ? kCheck : kCopy, tx + cw + 6, ly + 8, 14, hover ? VIOLET : PINK, 2.6f);
-    hit(x, H_Copy, tx, ly, cw + 6 + 14, 30);
+    c.text_mid(label, link_f, tx, y + 14, hover ? VIOLET : PINK, under);
+    c.icon(copied ? kCheck : kCopy, tx + cw + 6, y + 7, 14, hover ? VIOLET : PINK, 2.6f);
+    hit(x, H_Copy, tx, y, cw + 6 + 14, 28);
   }
+  // the bandana: the band with the heading sits on the sheet's top edge, the knot at its right end, the
+  // two loose ends beyond it
+  Font tab_f = D(13, 0.06f);
+  const float lh = c.line_h(tab_f);
+  const float bw = 3 + 14 + c.measure(v.tab, tab_f).width + 14 + 3, bh = 3 + 6 + lh + 5 + 3;
+  const float bx = L + 3 + 12, by = top + 3 - bh * 0.62f;
+  const float ends = 1.45f;  // (the ends as drawn for a band of 32: larger here, they are what the eye goes to)
+  c.push(Matrix::Scale(ends, ends) * Matrix::Translation(bx + bw - 7, by + bh / 2 - 15 * ends));
+  c.fill_path(kBandanaLow, x.accent);
+  c.stroke_path(kBandanaLow, 2.5f / ends * 1.2f, BLACK);
+  c.fill_path(kBandanaHigh, x.accent);
+  c.stroke_path(kBandanaHigh, 2.5f / ends * 1.2f, BLACK);
   c.pop();
-  // the rod it hangs from
-  c.box(L - 14, 64, (R - L) + 28, 13, EDGE, 3, BLACK);
-  for (float kx : {L - 24 + 9.5f, R + 24 - 9.5f}) {
-    c.ellipse(kx, 70.5f, 9.5f, 9.5f, BLACK);
-    c.ellipse(kx, 70.5f, 6.5f, 6.5f, x.accent);
-  }
+  c.box(bx, by, bw, bh, x.accent, 3, BLACK);
+  c.fill(bx + 3, by + 3, bw - 6, 3, 0xFFFFFF, 0.28f);  // (the cloth's sheen along its upper edge)
+  c.text_mid(v.tab, tab_f, bx + 3 + 14, by + 3 + 6 + lh / 2, PINK);
+  // the knot
+  const float kx = bx + bw - 2, ky = by + bh / 2;
+  c.push(Matrix::Rotation(45, D2D1::Point2F(kx, ky)));
+  c.round_box(kx - 7.5f, ky - 7.5f, 15, 15, 3, x.accent, 3, BLACK);
+  c.pop();
+  c.pop();
 }
 
 void hero(Ctx& x, const Vals& v) {
@@ -877,7 +887,7 @@ void hero(Ctx& x, const Vals& v) {
   c.text_mid(L"Изменить", cf, px + 8, cy, m.hover == H_Folder ? PAPER : TEXT2, under);
   hit(x, H_Folder, px, cy - 22, cw, 44);
 
-  banner(x, v);
+  paper(x, v);
 }
 
 // --- settings --------------------------------------------------------------------------------

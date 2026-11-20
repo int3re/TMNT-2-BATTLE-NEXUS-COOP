@@ -7,7 +7,7 @@
 
 <p align="center">
   <img alt="version 0.17.3" src="https://img.shields.io/badge/version-0.17.3-2ea44f">
-  <img alt="launcher 1.3.0" src="https://img.shields.io/badge/launcher-1.3.0-8BE836">
+  <img alt="launcher 1.3.1" src="https://img.shields.io/badge/launcher-1.3.1-8BE836">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="1–4 players" src="https://img.shields.io/badge/players-1–4-f59e0b">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/network-Steam%20·%20LAN%20·%20IP-1b2838">
