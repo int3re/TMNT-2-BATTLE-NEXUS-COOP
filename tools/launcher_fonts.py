@@ -1,12 +1,16 @@
-"""The launcher's fonts: static TTF files made from the Google Fonts pieces (variable, one file per range of
-characters) that an exported design page carries.
+"""The launcher's fonts (src/launcher/assets/fonts), all under the SIL Open Font License (OFL-*.txt beside
+them; none declares a reserved font name). Needs fontTools and brotli.
 
     python tools/launcher_fonts.py <folder with the .woff2 pieces> src/launcher/assets/fonts
+        Onest and JetBrains Mono: static TTF files made from the Google Fonts pieces (variable, one file per
+        range of characters) that an exported design page carries. For each family and weight the Latin and
+        the Cyrillic piece are pinned at that weight and merged into one file.
 
-For each family and weight the Latin and the Cyrillic piece are pinned at that weight and merged into one
-file. The fonts are under the SIL Open Font License (OFL-*.txt beside them); no reserved font names.
-Needs fontTools and brotli."""
+    python tools/launcher_fonts.py --display <DelaGothicOne-Regular.ttf> src/launcher/assets/fonts
+        The headings' font, Dela Gothic One (github.com/google/fonts, ofl/delagothicone): the Latin and the
+        Cyrillic part of it. The whole file is 2.5 MB, most of it Japanese the launcher never writes."""
 import glob, os, sys
+from fontTools import subset
 from fontTools.merge import Merger
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
@@ -71,5 +75,32 @@ def main(src, dst):
                 os.path.basename(out), os.path.getsize(out), len(cmap), 0x416 in cmap, ord("g") in cmap))
 
 
+def display(src, dst):
+    """Latin, Cyrillic, digits and punctuation of the headings' font; its names and metrics stay."""
+    os.makedirs(dst, exist_ok=True)
+    opt = subset.Options()
+    opt.layout_features = ["kern", "liga", "ccmp", "locl", "case", "mark", "mkmk"]
+    opt.name_IDs = ["*"]
+    opt.name_languages = ["*"]
+    opt.notdef_outline = True
+    opt.hinting = False
+    opt.drop_tables += ["DSIG", "vhea", "vmtx"]
+    font = TTFont(src)
+    ranges = [(0x20, 0x7E), (0xA0, 0xFF), (0x400, 0x45F), (0x490, 0x491), (0x2010, 0x2027), (0x2030, 0x203A), (0x20AC, 0x20AC),
+              (0x2116, 0x2116), (0x2122, 0x2122), (0x2190, 0x2193), (0x2212, 0x2212)]
+    sub = subset.Subsetter(opt)
+    sub.populate(unicodes=[c for a, b in ranges for c in range(a, b + 1)])
+    sub.subset(font)
+    out = os.path.join(dst, "DelaGothicOne-Regular.ttf")
+    font.save(out)
+    made = TTFont(out)
+    cmap = made.getBestCmap()
+    print("%-28s %6d bytes, %d characters, Cyrillic %s, Latin %s, family %r" % (
+        os.path.basename(out), os.path.getsize(out), len(cmap), 0x416 in cmap, ord("g") in cmap, made["name"].getDebugName(1)))
+
+
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    if sys.argv[1] == "--display":
+        display(sys.argv[2], sys.argv[3])
+    else:
+        main(sys.argv[1], sys.argv[2])

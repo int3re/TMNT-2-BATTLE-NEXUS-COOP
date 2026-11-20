@@ -192,7 +192,7 @@ endif()
 
 # --- tmnt2net-launcher.exe: finds the game, asks GitHub for the newest release, installs it, starts the game ---
 # Direct2D + DirectWrite + WinHTTP: nothing but Windows. The fonts are in the exe (src/launcher/assets/fonts,
-# made by tools/launcher_fonts.py); the headings' font, Dela Gothic One, only if its file is there.
+# made by tools/launcher_fonts.py); without the file of the headings' font, Dela Gothic One, a system font stands in.
 set(LAUNCHER_FONTS ${CMAKE_SOURCE_DIR}/src/launcher/assets/fonts)
 set(LAUNCHER_FONT_FILES ${LAUNCHER_FONTS}/Onest-Regular.ttf ${LAUNCHER_FONTS}/Onest-Medium.ttf ${LAUNCHER_FONTS}/Onest-SemiBold.ttf
                         ${LAUNCHER_FONTS}/Onest-Bold.ttf ${LAUNCHER_FONTS}/JetBrainsMono-Medium.ttf

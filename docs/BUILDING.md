@@ -146,8 +146,8 @@ python tools/gen_postfx.py
 
 - Шрифты лежат в `src/launcher/assets/fonts` и встраиваются в exe. Их делает `tools/launcher_fonts.py`
   (нужны `fontTools` и `brotli`) из файлов Google Fonts; лицензии — рядом. Шрифт заголовков, Dela Gothic
-  One, встраивается, только если в этой папке есть `DelaGothicOne-Regular.ttf`; без него заголовки рисует
-  Arial Black из Windows.
+  One, лежит там же урезанным до латиницы и кириллицы; без его файла сборка тоже проходит, и заголовки
+  рисует Arial Black из Windows.
 - Значок делает `tools/launcher_icon.py` (нужен `Pillow`).
 - Любой экран можно нарисовать в файл, не показывая окна: `tmnt2net-launcher.exe --shot update out.png`.
   Остальные ключи проверки — на [странице лаунчера](LAUNCHER.md#разработчикам).
