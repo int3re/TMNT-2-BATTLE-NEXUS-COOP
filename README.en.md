@@ -2,15 +2,22 @@
 
 <p align="center">
   <b>tmnt2net — online co-op for up to four players in TMNT 2: Battle Nexus (PC, 2004)</b><br>
-  Runs on Windows 10/11 · widescreen · modern gamepads · play over Steam or by code
+  One file · runs on Windows 10/11 · widescreen · modern gamepads · play over Steam or by code
 </p>
 
 <p align="center">
   <img alt="version 0.17.0" src="https://img.shields.io/badge/version-0.17.0-2ea44f">
+  <img alt="launcher 1.1.0" src="https://img.shields.io/badge/launcher-1.1.0-8BE836">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="1–4 players" src="https://img.shields.io/badge/players-1–4-f59e0b">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/network-Steam%20·%20LAN%20·%20IP-1b2838">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-lightgrey">
+  <img alt="downloads" src="https://img.shields.io/github/downloads/int3re/TMNT-2-BATTLE-NEXUS-COOP/total?color=5B3FD0&label=downloads">
+</p>
+
+<p align="center">
+  <a href="https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP/releases/latest/download/tmnt2net-launcher.exe"><img alt="Download tmnt2net-launcher.exe" src="https://img.shields.io/badge/DOWNLOAD-tmnt2net--launcher.exe-8BE836?style=for-the-badge&labelColor=5B3FD0" height="46"></a><br>
+  <sub>One file, 5.8 MB: the mod is inside the launcher. It installs the mod, updates it and starts the game.</sub>
 </p>
 
 <p align="center">
@@ -39,6 +46,46 @@ The same kind of mod for the first game of the series, *TMNT* (2003):
 > the detailed documentation in [`docs/`](docs/) are in Russian. The mod's own menu texts have English
 > counterparts for copies of the game whose font has no Russian letters; that path is far less tested.
 
+## The launcher: one file
+
+<p align="center">
+  <img src="docs/images/launcher-update.png" alt="The tmnt2net launcher: a new version of the mod is out" width="820">
+</p>
+
+**[`tmnt2net-launcher.exe`](https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP/releases/latest/download/tmnt2net-launcher.exe)** is the only thing to download: the mod is inside it and there is no separate
+installer. The launcher finds the game, installs the mod, watches for updates and starts the game. Its
+interface is in Russian.
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/launcher-install.png" alt="The launcher: the mod is not installed yet, and it is already inside the launcher" width="285"><br><b>1. Install</b><br><sub>The mod is already inside: one button, nothing to download</sub></td>
+    <td align="center" width="33%"><img src="docs/images/launcher-installing.png" alt="The launcher: installing" width="285"><br><b>2. A couple of seconds</b><br><sub>The files go next to the game; the game itself is not changed</sub></td>
+    <td align="center" width="33%"><img src="docs/images/launcher-installed.png" alt="The launcher: the mod is installed, ready to play" width="285"><br><b>3. Play</b><br><sub>The launcher tells you when a new version is out</sub></td>
+  </tr>
+</table>
+
+| What it does | How |
+|---|---|
+| **Finds the game** | in its own folder, by the game installer's entry in Windows, or in the folders next to it; otherwise it asks where `TMNT2.exe` is |
+| **Installs the mod offline** | the mod is inside the launcher; the game's files are not changed |
+| **Updates with one button** | the new version is downloaded from GitHub, checked against its SHA-256 and installed; settings and saves stay |
+| **Tells you whether you can still play with friends** | it shows the network protocol of both versions: "does not join 0.16.7 — update the whole team" |
+| **Updates itself** | a new version of the mod arrives as a new launcher, which takes the old one's place |
+| **Waits while the game is open** | or asks it to close, the way its window's close button does |
+| **Works where GitHub is hard to reach** | it tries the Windows settings, a VPN client on the same PC, or your proxy |
+| **Removes the mod** | one button in its settings: exactly what was installed is removed |
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/launcher-downloading.png" alt="The launcher: downloading an update" width="285"><br><sub>An update: download, SHA-256 check, install</sub></td>
+    <td align="center" width="33%"><img src="docs/images/launcher-running.png" alt="The launcher: the game is open" width="285"><br><sub>The game is open — the launcher waits</sub></td>
+    <td align="center" width="33%"><img src="docs/images/launcher-settings.png" alt="The launcher: settings" width="285"><br><sub>Settings: proxy, logs, removing the mod, accent colour</sub></td>
+  </tr>
+</table>
+
+Details (in Russian): **[the launcher page](docs/LAUNCHER.md)**. Without a window, from a command line:
+`tmnt2net-launcher.exe /install "game folder" /quiet`.
+
 ## What the mod adds and changes
 
 <p align="center">
@@ -61,6 +108,7 @@ The same kind of mod for the first game of the series, *TMNT* (2003):
 | **Gamepads** | Xbox pads have their buttons mixed up | Xbox, PlayStation, Switch Pro |
 | **Mouse** | not used | attacks on the mouse buttons, the wheel zooms the camera |
 | **Title menu** | new game, continue, options, quit | plus network play and mod settings |
+| **Installing and updating** | — | one file: [the launcher](#the-launcher-one-file) installs the mod, updates it and starts the game |
 
 A page with a screenshot for every menu and every change (in Russian):
 **[docs/TOUR.md](docs/TOUR.md)**.
@@ -161,19 +209,15 @@ Everything is set up inside the game, in its own font and style.
 
 ## Quick start
 
-<img src="docs/images/launcher-update.png" alt="The launcher: a new version of the mod is out" width="400" align="right">
-
-1. Download `tmnt2net-launcher.exe` from [Releases](../../releases/latest) and run it. It is the only
-   file: the mod is inside it.
-2. The launcher finds the game and installs the mod. From then on it offers updates and starts the game.
-   Its interface is in Russian; details are on the [launcher page](docs/LAUNCHER.md).
-3. Press the green button (**ИГРАТЬ**, play). The mod's version appears under the title menu, along with
-   two new items: network play (**СЕТЕВАЯ ИГРА**) and mod settings (**НАСТРОЙКИ МОДА**).
+1. Download **[`tmnt2net-launcher.exe`](https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP/releases/latest/download/tmnt2net-launcher.exe)** and run it. It is the only file: the mod is inside it. Every
+   version is on the [Releases](../../releases/latest) page.
+2. The launcher finds the game. Press the green button: first **УСТАНОВИТЬ МОД** (install the mod), then
+   **ИГРАТЬ** (play).
+3. The mod's version appears under the game's title menu, along with two new items: network play
+   (**СЕТЕВАЯ ИГРА**) and mod settings (**НАСТРОЙКИ МОДА**).
 
 > The launcher is not signed with a certificate, so Windows may show "Windows protected your PC". Click
 > "More info" → "Run anyway".
-
-<br clear="right">
 
 Playing together:
 
@@ -264,7 +308,7 @@ cmake -B build -A Win32
 cmake --build build --config Release
 ```
 
-The files and the installer end up in `build/dist/Release`. SDL2, ENet and Ultimate ASI Loader are not part
+The files and the launcher end up in `build/dist/Release`. SDL2, ENet and Ultimate ASI Loader are not part
 of the repository; where CMake expects them, and how to build with or without Steam, is described in
 [docs/BUILDING.md](docs/BUILDING.md).
 
@@ -282,6 +326,10 @@ compare checksums; a game that has gone its own way rejoins the session by itsel
 A player who joins a running game receives every frame bundle since the first frame and replays the session
 locally, with drawing and sound switched off, at roughly 37 times the game's speed.
 
+The launcher is a separate program with no dependencies: Direct2D and DirectWrite for the picture, WinHTTP
+for the network. The mod's files are in its resources. A new version arrives as a new launcher, which is
+downloaded, checked against the SHA-256 of the release and opened as data, never run.
+
 More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Credits and legal
@@ -293,12 +341,14 @@ More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - [SDL2](https://www.libsdl.org/) — gamepads.
 - [ENet](http://enet.bespin.org/) — networking over UDP.
 - Steamworks SDK — networking over Steam. The SDK is not part of this repository.
+- The launcher's fonts: [Dela Gothic One](https://github.com/syakuzen/DelaGothic),
+  [Onest](https://github.com/googlefonts/onest) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono).
 
 ### License
 
 The mod's code is released under the [MIT license](LICENSE). Third-party libraries keep their own licenses:
-MinHook — BSD 2-Clause, SDL2 — zlib, ENet — MIT, Ultimate ASI Loader — MIT. The game, its files and its
-artwork are not covered by the mod's license.
+MinHook — BSD 2-Clause, SDL2 — zlib, ENet — MIT, Ultimate ASI Loader — MIT, the launcher's fonts — SIL Open
+Font License 1.1. The game, its files and its artwork are not covered by the mod's license.
 
 This is an unofficial fan project. It is not affiliated with or endorsed by Konami, Mirage Studios, Viacom or
 any other rights holder. *Teenage Mutant Ninja Turtles* and related names and characters are trademarks of
