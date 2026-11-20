@@ -372,6 +372,34 @@ constexpr uintptr_t kKameIconDisp = 0x4DCCC0;
 constexpr uint8_t kKameIconDispHead[] = {0x83, 0xEC, 0x08, 0x57, 0x8B, 0xF9, 0x8B, 0x47, 0x58};
 constexpr int kAreaKamePos = 0x44, kAreaCleared = 0x58, kAreaAnimation = 0x160;
 constexpr uint8_t kAreaAnimKameMove = 1;
+// CAreaSequence::OnDraw (0x4DDF80, __thiscall): CAnim2DSequence::OnDraw 0x4F9610 (CSystem2D::BeginScene,
+// CAnimation2D::Draw 0x4F9830 = Rt2dMaestroRender 0x5BD2C0 of the map's picture - a Maestro scene, its
+// clouds among its children - EndScene), then the pool's (+0x38) TextureDraw 0x4DDEB0 (lines, marks,
+// names, the turtle) and the map's menu or the box with the area's name.
+constexpr uintptr_t kAreaSeqDraw = 0x4DDF80;
+constexpr uint8_t kAreaSeqDrawHead[] = {0x56, 0x8B, 0xF1, 0xE8, 0x88, 0xB6, 0x01, 0x00};
+constexpr uintptr_t kAnim2DDraw = 0x4F9830;
+constexpr uint8_t kAnim2DDrawHead[] = {0x56, 0x8B, 0xF1, 0x8B, 0x46, 0x04, 0x85, 0xC0};
+constexpr uintptr_t kRt2dMaestroRender = 0x5BD2C0;    // Rt2dMaestro* __cdecl(Rt2dMaestro*)
+constexpr uintptr_t kRt2dObjectMTMScale = 0x5B6040;   // Rt2dObject* __cdecl(Rt2dObject*, float, float)
+// Rt2dSceneForAllChildren(scene, Rt2dObject* cb(object, parent, data), data), __cdecl.
+constexpr uintptr_t kRt2dSceneForAllChildren = 0x5B6710;
+// Rt2dObject: +0 type (1 a scene of its own, 2 a shape, 4 a text), +4 depth (the draw goes from the
+// lowest), +8 flags (2: the LTM is to be worked out again - a scene's draw does it for itself and all
+// it holds; 4: shown), +0xC MTM (RwMatrix, 64 bytes: the object in its parent), +0x4C LTM (on the device).
+constexpr int kRt2dObjectDepth = 0x04, kRt2dObjectFlags = 0x08, kRt2dObjectMTM = 0x0C, kRt2dObjectLTM = 0x4C;
+// +0x8C the object's colour multiplier (four floats: red, green, blue, alpha), taken times its parent's at every draw.
+constexpr int kRt2dObjectColorMult = 0x8C;
+constexpr uint32_t kRt2dObjectDirtyLTM = 2, kRt2dObjectVisible = 4;
+constexpr int kRt2dObjectScene = 1, kRt2dObjectString = 4;
+// CAreaWorkPool::Move (0x4DD910, __thiscall): the map's keys, asked of the pads not locked to players
+// (port -2): the d-pad moves the turtle, OK enters the area, and at 0x4DDAC1 "push 0x200000" - the
+// pad's GUARD function - opens the map's menu (+0x60 = 1, CAreaMenu::AreaMenuInit 0x4D7590): the
+// stations, the heroes, options, save, load, back to the title. The menu itself closes by CANCEL.
+// Nothing on the map answers CANCEL, so Esc did nothing there.
+constexpr uintptr_t kAreaMenuKey = 0x4DDAC1;
+constexpr uint8_t kAreaMenuKeyOld[] = {0x68, 0x00, 0x00, 0x20, 0x00};  // push 0x200000
+constexpr uint8_t kAreaMenuKeyNew[] = {0x68, 0x00, 0x01, 0x20, 0x00};  // push 0x200100: GUARD or SELECT
 
 // --- player markers (Game/Component/Gauge/GaugeStatus.cpp) ----------------------------
 // CGaugeStatus_Container::PlayerMarkerDisp(player) (0x495F90, __thiscall, ret 4): the
@@ -592,6 +620,9 @@ constexpr int kSecretFirstCharacter = 1, kSecretLastCharacter = 4;
 // (field +0x3D8). The area map's CAreaWorkPool::Attach reads it at 0x4DBA92 (back at 0x4DBA97) to
 // put its cursor (Home 3 → the station 0x3D); OK on the station enters Home.
 constexpr uintptr_t kGetSelectedArea = 0x484870, kMapAttachReadsArea = 0x4DBA97;
+// The area sequence's own code (AreaSequence.cpp): the scene's load reads the area at 0x4D946B, the draw at
+// 0x4DDF10, the music at 0x4DDCC7.
+constexpr uintptr_t kAreaSeqCode = 0x4D9000, kAreaSeqCodeEnd = 0x4DE000;
 constexpr uint8_t kGetSelectedAreaHead[] = {0x8B, 0x81, 0xD8, 0x03, 0x00, 0x00, 0xC3};
 // Per player: [pool+0x320+i] samurai (game button 0x2000 held), [pool+0x324+i] nexus (0x400).
 constexpr uintptr_t kIsCostumeTaken = 0x4E1510;

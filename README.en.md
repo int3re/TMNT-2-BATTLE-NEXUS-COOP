@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.17.0" src="https://img.shields.io/badge/version-0.17.0-2ea44f">
-  <img alt="launcher 1.1.0" src="https://img.shields.io/badge/launcher-1.1.0-8BE836">
+  <img alt="version 0.17.1" src="https://img.shields.io/badge/version-0.17.1-2ea44f">
+  <img alt="launcher 1.1.1" src="https://img.shields.io/badge/launcher-1.1.1-8BE836">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="1–4 players" src="https://img.shields.io/badge/players-1–4-f59e0b">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/network-Steam%20·%20LAN%20·%20IP-1b2838">
@@ -185,7 +185,7 @@ Everything is set up inside the game, in its own font and style.
 - **The game starts on Windows 10/11.** The "Unkown Error" at start-up and the crash on Alt+Tab during
   loading are fixed.
 - **Widescreen without stretching** (16:9, 16:10, 21:9, 32:9): a wider view, menus and text in the right
-  proportions, gauges in the corners of the frame.
+  proportions, gauges in the corners of the frame, the world map out to the edges of the screen.
 - Borderless window over the whole monitor or an ordinary window; **any resolution of your monitor**,
   applied at once.
 - A steady **60 frames per second**, the game's native speed.
@@ -280,7 +280,7 @@ The detailed pages are in Russian.
 
 ## Versions and compatibility
 
-The current version is **0.17.0**; it is shown under the game's title menu.
+The current version is **0.17.1**; it is shown under the game's title menu.
 
 In a network game everyone needs a compatible version of the mod: the game must run identically on every PC,
 so any change to how it plays also changes the protocol version. The host refuses a player with an
@@ -288,6 +288,7 @@ incompatible version and says why.
 
 | Mod versions | Play together |
 |---|---|
+| 0.17.1 | with 0.17.1 only |
 | 0.17.0 | with 0.17.0 only |
 | 0.16.6 – 0.16.7 | yes |
 | 0.16.4 – 0.16.5 | yes |

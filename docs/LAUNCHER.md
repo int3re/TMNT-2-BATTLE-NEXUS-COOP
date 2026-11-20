@@ -162,9 +162,9 @@ tmnt2net-launcher.exe /uninstall "C:\Games\TMNT 2 - Battle Nexus" /quiet
 
 ```
 tmnt2net-package 1
-version 0.17.0
-protocol 15
-launcher 1.1.0
+version 0.17.1
+protocol 16
+launcher 1.1.1
 file winmm.dll 301 loader
 file tmnt2net.asi 302
 file steam_api.dll 303
@@ -183,14 +183,14 @@ file tmnt2net-README.md 305
 ```json
 {
   "schema": 2,
-  "version": "0.17.0",
-  "protocol": 15,
+  "version": "0.17.1",
+  "protocol": 16,
   "date": "2026-11-20",
-  "title": "Ровная игра по сети",
+  "title": "Карта мира на весь экран",
   "notes": ["…", "…"],
-  "launcher": {"name": "tmnt2net-launcher.exe", "size": 5768192, "sha256": "…", "version": "1.1.0"},
+  "launcher": {"name": "tmnt2net-launcher.exe", "size": 5768192, "sha256": "…", "version": "1.1.1"},
   "setup": {"name": "tmnt2net-launcher.exe", "size": 5768192, "sha256": "…"},
-  "protocols": {"0.17.0": 15, "0.16.7": 14}
+  "protocols": {"0.17.1": 16, "0.17.0": 15, "0.16.7": 14}
 }
 ```
 

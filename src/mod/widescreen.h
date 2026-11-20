@@ -6,6 +6,8 @@
 //   virtual screen (CSprite::m_fVirtualScreen*) is widened by the same factor,
 //   so that 640 virtual units cover the 4:3 middle. 2D placed in real pixels
 //   (fades, the players' markers projected from the world) keeps the full width.
+// - the area map (a 4:3 picture: a 2D scene) goes on to the frame's edges: its ground reflected in the
+//   side bars, its clouds, moons and planets as they are (map = wide).
 // See re/notes.md "Widescreen".
 #pragma once
 #include "mod/config.h"

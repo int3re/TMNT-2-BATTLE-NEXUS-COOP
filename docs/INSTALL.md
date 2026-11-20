@@ -90,7 +90,7 @@ tmnt2net-launcher.exe /uninstall "C:\Games\TMNT 2 - Battle Nexus" /quiet
 
 ## Проверка, что мод работает
 
-- под главным меню видна строка `tmnt2net 0.17.0`;
+- под главным меню видна строка `tmnt2net 0.17.1`;
 - в главном меню есть пункты **СЕТЕВАЯ ИГРА** и **НАСТРОЙКИ МОДА**;
 - в папке игры появился `tmnt2net.log`, в его начале — строка `TMNT2.exe sha256 … (NA retail 2004, supported)`.
 

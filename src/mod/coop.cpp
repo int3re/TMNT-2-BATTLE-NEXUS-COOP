@@ -654,8 +654,10 @@ int g_map_area = 0;
 
 int __fastcall hkSelectedArea(void* self, void* edx) {
   int v = oSelectedArea(self, edx);
-  if (g_map_area > 0 && _ReturnAddress() == reinterpret_cast<void*>(game::kMapAttachReadsArea)) {
-    LOGI("[debug] map_area: the map opens on area %d (was %d)", g_map_area, v);
+  // (everything of the map asks: its pool, the scene to load - the world's picture - its textures, its music)
+  auto from = reinterpret_cast<uintptr_t>(_ReturnAddress());
+  if (g_map_area > 0 && from >= game::kAreaSeqCode && from < game::kAreaSeqCodeEnd) {
+    if (from == game::kMapAttachReadsArea) LOGI("[debug] map_area: the map opens on area %d (was %d)", g_map_area, v);
     return g_map_area;
   }
   return v;

@@ -19,6 +19,7 @@
 // 9 = 0.13.0, 10 = 0.14.0 (sessions in a running game), 11 = 0.16.0 (costumes), 12 = 0.16.3 (every hero),
 // 13 = 0.16.4 (pause in a session), 14 = 0.16.6 (no move boundary between the players of a session),
 // 15 = 0.17.0 (what is near any player counts as in the stage camera's view; RosterPacket::lead).
+// 16 = 0.17.1 (the area map's menu opens by a pad's SELECT too: the keyboard's Esc).
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -27,7 +28,7 @@
 namespace tmnp {
 
 constexpr uint32_t kMagic = 0x504E3254;  // bytes 'T','2','N','P'
-constexpr uint16_t kVersion = 15;
+constexpr uint16_t kVersion = 16;
 constexpr uint16_t kDefaultPort = 7790;  // TMNT1's tmntnet uses 7777
 constexpr int kMaxPlayers = 4;
 constexpr int kHistory = 8;  // frames repeated in every input / bundle packet

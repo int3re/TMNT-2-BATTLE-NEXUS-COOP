@@ -89,6 +89,9 @@ bool load_config(const std::wstring& path, Config& cfg) {
   v = get(path, L"video", L"hud");
   if (v == "center") cfg.hud_center = true;
   if (v == "stretch") cfg.hud_center = false;
+  v = get(path, L"video", L"map");
+  if (v == "wide") cfg.map_wide = true;
+  if (v == "center") cfg.map_wide = false;
   v = get(path, L"net", L"steam_invites");
   if (!v.empty()) cfg.steam_invites = v != "0";
   v = get(path, L"net", L"wide");

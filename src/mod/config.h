@@ -20,6 +20,8 @@ struct Config {
   // shown (video.cpp): a 4:3 frame with bars, or the 4:3 frame stretched over the window.
   Aspect shape = Aspect::Wide;
   bool hud_center = true;           // hud = center | stretch (aspect = auto)
+  bool map_wide = true;             // map = wide | center (hud = center): the area map's picture goes on
+                                    // to the frame's edges, or stays 4:3 between black bars
   bool own_camera = true;           // own_camera = 1: in a network game the stage camera follows this PC's player
   float camera_zoom = 1.0f;         // the mouse wheel's zoom of the stage camera (0.5 closer .. 2.5 farther)
   float gauges_scale = 1.0f;        // gauges_size = 100 | 85 | 70 (%): the stage's ring and players' boxes

@@ -822,6 +822,13 @@ void install(const Config& cfg) {
                 (void*)&hkCheckPause, (void**)&oCheckPause);
   else
     LOGW("menus: pause check not recognised: no pause menu in a network game");
+  // The area map: its menu (the heroes, options, save, load, back to the title) opens by the guard key
+  // alone, and the map answers no CANCEL: Esc did nothing there, and there was no way from the map to
+  // the title for who does not know that key. SELECT - the keyboard's Esc - opens it as well; the menu
+  // closes by CANCEL, the same Esc. For every PC alike, whatever its settings: the map is a part of a
+  // session's game.
+  patch::replace("area map: Esc (the pad's SELECT) opens the map's menu, as the guard key does", game::kAreaMenuKey,
+                 game::kAreaMenuKeyOld, game::kAreaMenuKeyNew, sizeof(game::kAreaMenuKeyNew));
   if (!oGetText) return;
   if (patch::bytes_are(game::kOptionsMove, game::kOptionsMoveHead, sizeof(game::kOptionsMoveHead)) &&
       patch::bytes_are(game::kOptionsDraw, game::kOptionsDrawHead, sizeof(game::kOptionsDrawHead))) {
