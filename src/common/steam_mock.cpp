@@ -488,8 +488,10 @@ class Browser final : public lobby::IBrowser {
       return;
     }
     std::vector<uint64_t> members = fresh_members(lobby);
-    if (!members.empty() && members[0] != g.id) {
-      finish(false, lobby, 0, "В лобби уже есть второй игрок.");
+    size_t others = 0;  // (the host is not a member file: up to three guests, as a real lobby of four)
+    for (uint64_t m : members) others += m != g.id ? 1 : 0;
+    if (others >= 3) {
+      finish(false, lobby, 0, "В лобби уже четыре игрока.");
       return;
     }
     joined_ = lobby;

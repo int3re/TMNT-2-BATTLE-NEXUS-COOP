@@ -2288,6 +2288,11 @@ bool take_begin(uint32_t* seed) {
   g_begin = false;
   g_active = true;
   g_session_on = true;
+  g_slow.since.QuadPart = 0;  // (the pace is measured from this session's first frame, not from an earlier one's)
+  g_slow.frames = 0;
+  g_slow.waited = 0;
+  g_slow.run = 0;
+  for (double& v : g_slow.by) v = 0;
   if (seed) *seed = kSessionSeed;
   if (uint8_t* r = record()) {  // every game plays with the session's progress; its own comes back after
     if (!g_rec_own_kept) {

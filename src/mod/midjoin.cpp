@@ -264,9 +264,15 @@ void __fastcall hkAddPlayers(void* stage, void* edx, int blink) {
 }  // namespace
 
 void frame_players(uint32_t frame, uint8_t mask) {
-  if (!g_started) {  // the session's first players: the character select places them
+  // A session's first frame: its first players - the character select places them. (Every session's: a
+  // game plays one after another without a restart. Until 0.16.6 the players of the session before stayed
+  // "known": in a game that had played with fewer players, the others of the next session counted as
+  // having joined in mid-game and were given a turtle of the team before the first stage - in that game
+  // only: another team there than on the other PCs, and the games parted as the stage began.)
+  if (frame <= 1 || !g_started) {
     g_started = true;
     g_known = mask;
+    g_pending = 0;
     return;
   }
   uint8_t fresh = (uint8_t)(mask & ~g_known);
