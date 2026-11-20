@@ -1,7 +1,9 @@
 // The launcher's picture: every screen of the design, drawn from the model. Sizes and colours are the
 // design's (a 960 x 600 window: header 48, body 508, footer 44).
+#include <algorithm>
 #include <cmath>
 
+#include "launcher/gameset.h"
 #include "launcher/launcher.h"
 
 namespace lz {
@@ -15,7 +17,8 @@ using gfx::TextOpt;
 
 const uint32_t BAR = 0x07060F, PANEL = 0x161230, LINE = 0x30275A, EDGE = 0x6F60B0, PAPER = 0xF2EFE2, TEXT2 = 0xD4CFEA,
                MUTED = 0xA9A2CC, GREEN = 0x8BE836, INK = 0x07100A, PINK = 0x0E0B1C, VIOLET = 0x5B3FD0, DEEP = 0x2B1F6B,
-               WAIT = 0xF2C94C, RED = 0xEF5A5A, RED_TEXT = 0xFF8A8A, RED_EDGE = 0xC24A4A, BLACK = 0x000000;
+               WAIT = 0xF2C94C, RED = 0xEF5A5A, RED_TEXT = 0xFF8A8A, RED_EDGE = 0xC24A4A, BLACK = 0x000000,
+               FIELD = 0x0C0A18, TRACK = 0x1F1840, DIM = 0x6F6996;
 const uint32_t kBandana[4] = {0x4C9AF0, 0xEF5A5A, 0xA77BF5, 0xF7941D};
 
 Font D(float size, float spacing = 0) { return {gfx::Display, size, 400, spacing}; }
@@ -37,6 +40,11 @@ const char kFolder[] = "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2
 const char kExternal[] = "M13 5h6v6M19 5l-9 9M10 7H5v12h12v-5";
 const char kCopy[] = "M9 9h11v11H9ZM5 15H4V4h11v1";
 const char kBack[] = "M20 12H5M11 6l-6 6 6 6";
+const char kPrev[] = "M14 6l-6 6 6 6";
+const char kNext[] = "M10 6l6 6-6 6";
+const char kMinus[] = "M6 12h12";
+const char kPlus[] = "M6 12h12M12 6v12";
+const char kNote[] = "M12 11v6M12 7.4v0.4";  // in a ring of 9 around 12, 12
 const char kKatana[] = "M4 20l3-3M7 17L20 4M6 14l4 4";
 const char kSai[] = "M12 3v18M7 8c0 4 2 6 5 6c3 0 5-2 5-6M9 18h6";
 const char kBo[] = "M4 20L20 4M8 13l3 3M13 8l3 3";
@@ -479,20 +487,14 @@ void footer(Ctx& x, const Vals& v) {
   c.ellipse(20, cy, 4, 4, dot[v.net_state % 3]);
   Font f = T(12);
   const std::wstring& line = flash ? m.flash : v.net;
-  c.text_mid(line, f, 32, cy, flash ? PAPER : TEXT2);
-  float px = 32 + c.measure(line, f).width + 14;
-  c.fill(px, cy - 7, 1, 14, LINE);
-  px += 1 + 14;
-  Font mono = Mo(12, 500);
-  float rw = c.measure(kRepoText, mono).width;
-  c.text_mid(kRepoText, mono, px, cy, m.hover == H_Repo ? PAPER : MUTED);
-  hit(x, H_Repo, px, top + 6, rw, 34);
   // the right end: the four bandanas, before them a line of small print
   const float sx = kW - 16 - (4 * 16 + 3 * 3);
   stripes(c, sx, cy, 16, 6, 3);
+  float right = sx;  // where the small print begins
   if (m.swapped) {
     const wchar_t* s = L"Новый лаунчер откроется при следующем запуске";
-    c.text_mid(s, f, sx - 14 - c.measure(s, f).width, cy, MUTED);
+    right = sx - 14 - c.measure(s, f).width;
+    c.text_mid(s, f, right, cy, MUTED);
   } else if (m.rel.full && !from_github(m) && !m.rel.launcher_version.empty() && m.screen != Screen::Downloading &&
              core::compare_versions(m.rel.launcher_version, kLauncherVersion) > 0) {
     // (a newer launcher with the same mod; with a newer mod it comes along with the update)
@@ -500,11 +502,27 @@ void footer(Ctx& x, const Vals& v) {
     TextOpt u;
     u.underline = true;
     float w = c.measure(s, f).width;
-    c.text_mid(s, f, sx - 14 - w, cy, m.hover == H_NewLauncher ? PAPER : x.accent, u);
-    hit(x, H_NewLauncher, sx - 14 - w, top + 6, w, 34);
+    right = sx - 14 - w;
+    c.text_mid(s, f, right, cy, m.hover == H_NewLauncher ? PAPER : x.accent, u);
+    hit(x, H_NewLauncher, right, top + 6, w, 34);
   } else {
     const wchar_t* s = L"Неофициальный фанатский мод · MIT";
-    c.text_mid(s, f, sx - 14 - c.measure(s, f).width, cy, MUTED);
+    right = sx - 14 - c.measure(s, f).width;
+    c.text_mid(s, f, right, cy, MUTED);
+  }
+  TextOpt one;
+  one.ellipsis = true;
+  one.max_w = right - 14 - 32;
+  c.text_mid(line, f, 32, cy, flash ? PAPER : TEXT2, one);
+  float px = 32 + std::min(c.measure(line, f).width, one.max_w) + 14;
+  // the repository's address after the line, where a long passing note leaves room for it
+  Font mono = Mo(12, 500);
+  float rw = c.measure(kRepoText, mono).width;
+  if (px + 1 + 14 + rw + 14 <= right) {
+    c.fill(px, cy - 7, 1, 14, LINE);
+    px += 1 + 14;
+    c.text_mid(kRepoText, mono, px, cy, m.hover == H_Repo ? PAPER : MUTED);
+    hit(x, H_Repo, px, top + 6, rw, 34);
   }
 }
 
@@ -898,11 +916,10 @@ void swatch(Ctx& x, int index, float sx, float sy, const char* weapon) {
   c.pop();
 }
 
-void settings(Ctx& x) {
+// Back, the title, and the pages' tabs at the right.
+void settings_head(Ctx& x, float left, float top) {
   Canvas& c = x.c;
   const Model& m = x.m;
-  const float left = 40, top = 48 + 20;
-  // back, and the title
   Font bf = T(13, 700);
   float bw = 2 + 10 + 18 + 8 + c.measure(L"Назад", bf).width + 14 + 2;
   bool hover = m.hover == H_Back;
@@ -919,6 +936,36 @@ void settings(Ctx& x) {
   c.text(L"НАСТРОЙКИ", tf, tx, top + 7, PAPER, tl);
   c.pop();
 
+  const wchar_t* names[4] = {L"ЛАУНЧЕР", L"ГРАФИКА", L"ЗВУК", L"УПРАВЛЕНИЕ"};
+  Font nf = D(12, 0.06f);
+  float widths[4], total = 3 * 10;
+  for (int i = 0; i < 4; ++i) {
+    widths[i] = 14 + c.measure(names[i], nf).width + 14;
+    total += widths[i];
+  }
+  float px = kW - left - 6 - total;
+  for (int i = 0; i < 4; ++i) {
+    const float w = widths[i];
+    const bool on = static_cast<int>(m.tab) == i, over = m.hover == H_Tab0 + i;
+    c.push(Matrix::Skew(-7, 0, D2D1::Point2F(px + w / 2, top + 22)));
+    if (on) {
+      c.fill(px + 4, top + 4, w, 44, VIOLET);
+      c.box(px, top, w, 44, x.accent, 3, BLACK);
+    } else {
+      if (over) c.fill(px, top, w, 44, PAPER, 0.07f);
+      c.border(px, top, w, 44, 2, over ? PAPER : EDGE);
+    }
+    c.text_mid(names[i], nf, px + 14, top + 22, on ? PINK : PAPER);
+    hit(x, H_Tab0 + i, px, top, w, 44);
+    c.pop();
+    px += w + 10;
+  }
+}
+
+// ЛАУНЧЕР: updates, the network, the game and the mod, the launcher's own look.
+void page_launcher(Ctx& x, float left, float top) {
+  Canvas& c = x.c;
+  const Model& m = x.m;
   const float col_w = (kW - 80 - 28) / 2.0f, x1 = left, x2 = left + col_w + 28;
   const float cw = col_w - 4 - 32;
   Font tiny = T(12);
@@ -1016,6 +1063,245 @@ void settings(Ctx& x) {
   toggle_row(x, H_Toggle3, L"Закрывать лаунчер, когда игра запущена", m.set.close_on_play, s.cx, y, cw);
 }
 
+// --- the game's settings: ГРАФИКА, ЗВУК, УПРАВЛЕНИЕ --------------------------------------------------
+
+// A value with an arrow at each side.
+void stepper(Ctx& x, int id_prev, int id_next, const std::wstring& value, float sx, float sy, float w, float h, bool on) {
+  Canvas& c = x.c;
+  c.box(sx, sy, w, h, FIELD, 2, on ? EDGE : LINE);
+  const int ids[2] = {id_prev, id_next};
+  for (int side = 0; side < 2; ++side) {
+    const float bx = side == 0 ? sx + 2 : sx + w - 2 - 40;
+    const bool over = on && x.m.hover == ids[side], down = on && x.m.pressed == ids[side];
+    if (over || down) c.fill(bx, sy + 2, 40, h - 4, PAPER, down ? 0.16f : 0.08f);
+    c.icon(side == 0 ? kPrev : kNext, bx + 11, sy + (h - 18) / 2, 18, on ? PAPER : DIM, 2.8f);
+    c.fill(side == 0 ? sx + 42 : sx + w - 44, sy + 2, 2, h - 4, LINE);
+    if (on) hit(x, ids[side], side == 0 ? sx : sx + w - 44, sy, 44, h);
+  }
+  Font f = T(13, 700);
+  TextOpt one;
+  one.ellipsis = true;
+  one.max_w = w - 88 - 8;
+  float tw = c.measure(value, f).width;
+  if (tw > one.max_w) tw = one.max_w;
+  c.text_mid(value, f, sx + (w - tw) / 2, sy + h / 2, on ? PAPER : DIM, one);
+}
+
+// One of the buttons that stand in a row, the chosen one lit.
+void seg_button(Ctx& x, int id, const wchar_t* label, float bx, float by, float w, float h, bool chosen, bool on) {
+  Canvas& c = x.c;
+  const bool over = on && x.m.hover == id, down = on && x.m.pressed == id;
+  c.fill(bx, by, w, h, chosen ? (on ? GREEN : LINE) : PANEL);
+  if (!chosen && (over || down)) c.fill(bx, by, w, h, PAPER, down ? 0.14f : 0.07f);
+  c.border(bx, by, w, h, 2, chosen ? BLACK : over ? PAPER : on ? EDGE : LINE);
+  Font f = T(13, 700);
+  c.text_mid(label, f, bx + (w - c.measure(label, f).width) / 2, by + h / 2, chosen ? (on ? INK : TEXT2) : on ? PAPER : DIM);
+  if (on) hit(x, id, bx, by, w, h);
+}
+
+// A sound level: quieter, ten blocks, louder. Ends at `right`.
+void level(Ctx& x, gset::Row r, float right, float sy, float h, bool on) {
+  Canvas& c = x.c;
+  const int base = H_Row + r * kRowParts, v = gset::value(r);
+  const float bw = 13, gap = 4, blocks = gset::kLevelMax * bw + (gset::kLevelMax - 1) * gap;
+  const float plus = right - 44, first = plus - 8 - 4 - blocks, minus = first - 4 - 8 - 44;
+  const struct {
+    int id;
+    float bx;
+    const char* icon;
+  } ends[2] = {{base + P_Minus, minus, kMinus}, {base + P_Plus, plus, kPlus}};
+  for (const auto& e : ends) {
+    const bool over = on && x.m.hover == e.id, down = on && x.m.pressed == e.id;
+    if (over || down) c.fill(e.bx, sy, 44, h, PAPER, down ? 0.14f : 0.07f);
+    c.border(e.bx, sy, 44, h, 2, over ? PAPER : on ? EDGE : LINE);
+    c.icon(e.icon, e.bx + 13, sy + (h - 18) / 2, 18, on ? PAPER : DIM, 2.8f);
+    if (on) hit(x, e.id, e.bx, sy, 44, h);
+  }
+  const float cy = sy + h / 2;
+  for (int i = 1; i <= gset::kLevelMax; ++i) {
+    const float bx = first + (i - 1) * (bw + gap);
+    const bool lit = i <= v, over = on && x.m.hover == base + P_Item + i;
+    c.push(Matrix::Skew(-12, 0, D2D1::Point2F(bx + bw / 2, cy)));
+    c.box(bx, cy - 11, bw, 22, lit ? (on ? GREEN : LINE) : TRACK, 2, lit && on ? BLACK : over ? PAPER : on ? EDGE : LINE);
+    c.pop();
+    if (on) hit(x, base + P_Item + i, bx - gap / 2, sy, bw + gap, h);
+  }
+}
+
+// A row of the game's settings: its name, and at the right what sets it.
+void game_row(Ctx& x, gset::Row r, float lx, float ty, float w, float h) {
+  Canvas& c = x.c;
+  const bool on = gset::usable(r);
+  const int base = H_Row + r * kRowParts;
+  c.text_mid(gset::label(r), T(14), lx, ty + h / 2, on ? PAPER : DIM);
+  switch (gset::kind(r)) {
+    case gset::Kind::Choice:
+      stepper(x, base + P_Prev, base + P_Next, gset::name(r, gset::value(r)), lx + w - 220, ty, 220, h, on);
+      break;
+    case gset::Kind::Level:
+      level(x, r, lx + w, ty, h, on);
+      break;
+    case gset::Kind::Pair: {
+      const float half = (240 - 8) / 2.0f;
+      for (int i = 0; i < 2; ++i)
+        seg_button(x, base + P_Item + i, gset::name(r, i).c_str(), lx + w - 240 + i * (half + 8), ty, half, h, gset::value(r) == i, on);
+      break;
+    }
+  }
+}
+
+// The line under a page: a note at the left, "По умолчанию" at the right. It stands on the dark ground
+// under the arena, whatever the height of the boxes above.
+void page_foot(Ctx& x, float left, const std::wstring& note, uint32_t rgb, bool reset_on) {
+  Canvas& c = x.c;
+  const float y = kH - 44 - 5 - 44;
+  Font bf = T(13, 700);
+  const float bw = 2 + 16 + c.measure(L"По умолчанию", bf).width + 16 + 2, right = kW - left;
+  TextOpt wrap;
+  wrap.wrap = true;
+  wrap.max_w = right - bw - 20 - (left + 18 + 10);
+  wrap.line_h = 12 * 1.45f;
+  const float nh = c.measure(note, T(12), wrap).height, ny = y + (44 - nh) / 2;
+  c.push(Matrix::Scale(18.0f / 24, 18.0f / 24) * Matrix::Translation(left, ny));
+  c.ring(12, 12, 9, 2.2f, rgb);
+  c.stroke_path(kNote, 2.2f, rgb);
+  c.pop();
+  c.text(note, T(12), left + 18 + 10, ny, rgb, wrap);
+  if (reset_on) {
+    ghost_button(x, H_Reset, L"По умолчанию", right - bw, y, 44, 16, false);
+  } else {
+    c.border(right - bw, y, bw, 44, 2, LINE);
+    c.text_mid(L"По умолчанию", bf, right - bw + 18, y + 22, DIM);
+  }
+}
+
+const wchar_t kNoMod[] = L"Мод не установлен. Эти настройки появятся вместе с ним: они хранятся в tmnt2net.ini в папке игры.";
+
+// ГРАФИКА and ЗВУК: two boxes of rows.
+void page_game(Ctx& x, float left, float top, bool sound) {
+  Canvas& c = x.c;
+  struct Group {
+    const wchar_t* name;
+    int from, to;
+    std::wstring note;
+    uint32_t note_rgb;
+  };
+  const Group groups[2][2] = {
+      {{L"ЭКРАН", gset::kMode, gset::kFirstPicture, L"", MUTED}, {L"КАРТИНКА", gset::kFirstPicture, gset::kFirstSound, L"", MUTED}},
+      {{L"ГРОМКОСТЬ", gset::kFirstSound, gset::kFirstGame,
+        gset::keeps_levels() ? L"Громкость запоминает мод: сама игра хранит её только в сохранении."
+                             : L"Громкость из лаунчера понимает мод 0.17.2 и новее: обновите мод.",
+        gset::keeps_levels() ? MUTED : WAIT},
+       {L"ИГРА", gset::kFirstGame, gset::kRows, L"В сетевой игре игра не останавливается никогда — и в фоне тоже.", MUTED}}};
+  const Group* page = groups[sound ? 1 : 0];
+  const float col_w = (kW - 2 * left - 28) / 2.0f, cw = col_w - 4 - 32;
+  const int most = std::max(page[0].to - page[0].from, page[1].to - page[1].from);
+  // (seven rows in a box: they stand a little closer than the six the page was drawn for)
+  const float row_h = most > 6 ? 40.0f : 44.0f, row_gap = most > 6 ? 4.0f : 6.0f;
+  const float h3 = c.line_h(D(13, 0.06f));
+  TextOpt wrap;
+  wrap.wrap = true;
+  wrap.max_w = cw;
+  wrap.line_h = 12 * 1.45f;
+  float box_h = 0;
+  for (int i = 0; i < 2; ++i) {
+    const int n = page[i].to - page[i].from;
+    float h = 2 + 14 + h3 + 2 + 6 + n * row_h + (n - 1) * row_gap + 14 + 2;
+    if (!page[i].note.empty()) h += row_gap + 4 + c.measure(page[i].note, T(12), wrap).height;
+    box_h = std::max(box_h, h);
+  }
+  const float y1 = top + 44 + 16;
+  for (int i = 0; i < 2; ++i) {
+    Section s = section_begin(x, left + i * (col_w + 28), y1, col_w, box_h, page[i].name);
+    float y = s.cy + 2 + 6;
+    for (int r = page[i].from; r < page[i].to; ++r) {
+      game_row(x, static_cast<gset::Row>(r), s.cx, y, cw, row_h);
+      y += row_h + row_gap;
+    }
+    if (!page[i].note.empty()) c.text(page[i].note, T(12), s.cx, y + 4, page[i].note_rgb, wrap);
+  }
+  const bool mod = gset::has_mod();
+  const wchar_t* note = !mod ? kNoMod
+                        : sound ? L"Громкость — та же, что в игре: ОПЦИИ → ЗВУК. Заставки и игра в фоне — НАСТРОЙКИ МОДА в главном "
+                                  L"меню игры. Действует со следующего запуска игры."
+                                : L"Настройки мода из tmnt2net.ini — те же строки, что в игре: ОПЦИИ → ЭКРАН. Действуют со следующего "
+                                  L"запуска игры.";
+  page_foot(x, left, note, mod ? MUTED : WAIT, mod);
+}
+
+// УПРАВЛЕНИЕ: who plays at the keyboard, the layout, a cell for every action's key.
+void page_controls(Ctx& x, float left, float top) {
+  Canvas& c = x.c;
+  const Model& m = x.m;
+  const bool on = gset::has_mod(), two = gset::keyboard_players() == 2;
+  const int rows = two ? 4 : 5;
+  const float cell_gap = two ? 6.0f : 4.0f, grid_h = rows * 44 + (rows - 1) * cell_gap;
+  const float h3 = c.line_h(D(13, 0.06f)), y1 = top + 44 + 16;
+  const float box_h = 2 + 14 + h3 + 10 + 44 + 10 + 2 + 10 + grid_h + 14 + 2;
+  Section s = section_begin(x, left, y1, kW - 2 * left, box_h, L"КЛАВИАТУРА И МЫШЬ");
+  float y = s.cy + 10;
+  const float half = (240 - 8) / 2.0f;
+  seg_button(x, H_KeysOne, L"Один игрок", s.cx, y, half, 44, !two, on);
+  seg_button(x, H_KeysTwo, L"Двое", s.cx + half + 8, y, half, 44, two, on);
+  if (two) {
+    const wchar_t* legend = L"левая половина клавиатуры · правая половина";
+    c.text_mid(legend, T(13), s.cx + s.cw - c.measure(legend, T(13)).width, y + 22, TEXT2);
+  } else {
+    const wchar_t* names[3] = {L"Как в игре", L"WASD + мышь", L"Своя"};
+    stepper(x, H_LayoutPrev, H_LayoutNext, names[gset::layout() % 3], s.cx + s.cw - 220, y, 220, 44, on);
+    c.text_mid(L"Раскладка", T(14), s.cx + s.cw - 220 - 14 - c.measure(L"Раскладка", T(14)).width, y + 22, on ? PAPER : DIM);
+  }
+  y += 44 + 10;
+  c.fill(s.cx, y, s.cw, 2, LINE);
+  y += 2 + 10;
+  const float col_w = (s.cw - 2 * 28) / 3;
+  Font kf = Mo(12, 700);
+  if (two) {
+    for (int i = 0; i < gset::kHalfRows; ++i) {
+      const float cx = s.cx + (i / rows) * (col_w + 28), cy = y + (i % rows) * (44 + cell_gap);
+      c.text_mid(gset::half_label(i), T(14), cx, cy + 22, on ? PAPER : DIM);
+      const std::wstring keys = gset::half_keys(i);
+      const float bx = cx + col_w - 150;
+      c.border(bx, cy, 150, 44, 2, LINE);
+      c.text_mid(keys, kf, bx + (150 - c.measure(keys, kf).width) / 2, cy + 22, on ? TEXT2 : DIM);
+    }
+  } else {
+    for (int a = 0; a < gset::kKeyActions; ++a) {
+      const float cx = s.cx + (a / rows) * (col_w + 28), cy = y + (a % rows) * (44 + cell_gap);
+      const bool waiting = on && m.capture == a, over = on && m.hover == H_Key + a;
+      c.text_mid(gset::action_label(a), T(14), cx, cy + 22, on ? PAPER : DIM);
+      const float bx = cx + col_w - 128;
+      c.box(bx, cy, 128, 44, waiting ? 0x241C52 : FIELD, 2, waiting ? x.accent : over ? PAPER : on ? EDGE : LINE);
+      const std::wstring text = waiting ? std::wstring(L"нажмите…") : gset::key_name(gset::key_code(a));
+      TextOpt one;
+      one.ellipsis = true;
+      one.max_w = 128 - 16;
+      float tw = c.measure(text, kf).width;
+      if (tw > one.max_w) tw = one.max_w;
+      c.text_mid(text, kf, bx + (128 - tw) / 2, cy + 22, waiting ? x.accent : on ? PAPER : DIM, one);
+      if (on) hit(x, H_Key + a, bx, cy, 128, 44);
+    }
+  }
+  const wchar_t* note = !on ? kNoMod
+                        : m.capture >= 0 ? L"Нажмите клавишу или кнопку мыши: правую, боковую — или левую по этой же ячейке. Esc — отмена."
+                        : two ? L"Двое за одной клавиатурой: у каждой половины свои постоянные клавиши. Enter и Esc остаются для меню. "
+                                L"Кнопки геймпада настраиваются в игре."
+                              : L"Клавиши — те же, что в игре: ОПЦИИ → УПРАВЛЕНИЕ. Стрелки, Enter и Esc работают всегда. По сети "
+                                L"каждый играет этими клавишами. Кнопки геймпада настраиваются в игре.";
+  page_foot(x, left, note, !on ? WAIT : m.capture >= 0 ? TEXT2 : MUTED, on);
+}
+
+void settings(Ctx& x) {
+  const float left = 40, top = 48 + 20;
+  settings_head(x, left, top);
+  switch (x.m.tab) {
+    case Tab::Graphics: page_game(x, left, top, false); break;
+    case Tab::Sound: page_game(x, left, top, true); break;
+    case Tab::Controls: page_controls(x, left, top); break;
+    default: page_launcher(x, left, top); break;
+  }
+}
+
 }  // namespace
 
 bool primary_enabled(const Model& m) { return vals(m).primary_on; }
@@ -1100,6 +1386,15 @@ bool demo(const std::wstring& screen, Model& m) {
   } else if (screen == L"settings") {
     m.screen = Screen::Settings;
     m.back = Screen::Update;
+  } else if (screen == L"graphics" || screen == L"sound" || screen == L"controls" || screen == L"controls2" ||
+             screen == L"capture") {
+    m.screen = Screen::Settings;
+    m.back = Screen::Ready;
+    m.inst.version = L"0.17.2";
+    m.inst.protocol = 16;
+    m.tab = screen == L"graphics" ? Tab::Graphics : screen == L"sound" ? Tab::Sound : Tab::Controls;
+    gset::load_canned(screen == L"controls2");
+    if (screen == L"capture") m.capture = 6;
   } else {
     return false;
   }

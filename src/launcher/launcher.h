@@ -5,6 +5,7 @@
 //   core:  the game folder, the installed mod, settings, the release (core.cpp)
 //   pkg:   the mod inside a launcher file, putting it into the game folder and taking it out (package.cpp)
 //   net:   HTTP through WinHTTP, with or without a proxy (net.cpp)
+//   gset:  the game's own settings on the ГРАФИКА, ЗВУК and УПРАВЛЕНИЕ pages (gameset.h, gameset.cpp)
 #pragma once
 #include <windows.h>
 
@@ -20,7 +21,7 @@
 namespace lz {
 
 constexpr int kW = 960, kH = 600;  // the window, in units of 1/96 inch
-constexpr wchar_t kLauncherVersion[] = L"1.1.1";
+constexpr wchar_t kLauncherVersion[] = L"1.2.0";
 constexpr wchar_t kRepoUrl[] = L"https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 constexpr wchar_t kRepoText[] = L"github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP";
 
@@ -61,12 +62,16 @@ struct Settings {
   std::vector<std::wstring> notes;
 };
 
+enum class Tab { Launcher, Graphics, Sound, Controls };  // the pages of the settings
+
 enum class Pending { None, Install, Uninstall, Launcher };
 enum class Fix { None, Retry, Back, Recheck };
 
 struct Model {
   Screen screen = Screen::Checking;
   Screen back = Screen::Ready;  // under the settings
+  Tab tab = Tab::Launcher;      // the settings' page
+  int capture = -1;             // УПРАВЛЕНИЕ: the action that waits for a key (-1: none)
   Settings set;
   Installed inst;
   Release rel;   // what GitHub says
@@ -106,8 +111,16 @@ enum HitId {
   H_Back, H_Toggle1, H_Toggle2, H_Toggle3, H_ProxyAuto, H_ProxyNone, H_ProxyOwn, H_ProxyField,
   H_FolderSettings, H_OpenLog, H_DesyncLogs, H_Reinstall, H_Uninstall,
   H_Accent0, H_Accent1, H_Accent2, H_Accent3,
-  H_Count
+  H_Tab0, H_Tab1, H_Tab2, H_Tab3,                      // the settings' pages
+  H_Reset,                                             // "По умолчанию" of the page shown
+  H_KeysOne, H_KeysTwo, H_LayoutPrev, H_LayoutNext,    // УПРАВЛЕНИЕ
+  H_Count,
+  // A row of the game's settings (gset::Row r): H_Row + r * kRowParts + a part.
+  H_Row = 1000,
+  H_Key = 2000,  // + the key action: its cell
 };
+constexpr int kRowParts = 16;
+enum RowPart { P_Prev, P_Next, P_Minus, P_Plus, P_Item };  // P_Item + i: a level's block i, or a pair's button i
 struct Hit {
   int id;
   D2D1_RECT_F r;     // in the space of `inv`
@@ -149,6 +162,7 @@ std::wstring repo();                 // its address: github.com/..., unless a te
 extern std::wstring g_settings_path; // tests: another settings file (--settings)
 extern std::wstring g_cache_dir;     // tests: another folder for downloads (--cache)
 
+std::wstring downloads_dir();        // where downloads are kept (and a copy of the game's settings before a change)
 std::wstring join(const std::wstring& dir, const std::wstring& name);
 std::wstring trimmed(std::wstring dir);  // a folder without the slash at its end
 bool exists(const std::wstring& path);

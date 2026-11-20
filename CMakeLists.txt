@@ -232,6 +232,7 @@ file tmnt2net-README.md 305
     src/launcher/view.cpp
     src/launcher/gfx.cpp
     src/launcher/core.cpp
+    src/launcher/gameset.cpp
     src/launcher/package.cpp
     src/launcher/net.cpp
     src/common/sha256.cpp

@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <img alt="version 0.17.1" src="https://img.shields.io/badge/version-0.17.1-2ea44f">
-  <img alt="launcher 1.1.1" src="https://img.shields.io/badge/launcher-1.1.1-8BE836">
+  <img alt="version 0.17.2" src="https://img.shields.io/badge/version-0.17.2-2ea44f">
+  <img alt="launcher 1.2.0" src="https://img.shields.io/badge/launcher-1.2.0-8BE836">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4">
   <img alt="1–4 players" src="https://img.shields.io/badge/players-1–4-f59e0b">
   <img alt="Steam, LAN, IP" src="https://img.shields.io/badge/network-Steam%20·%20LAN%20·%20IP-1b2838">
@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP/releases/latest/download/tmnt2net-launcher.exe"><img alt="Download tmnt2net-launcher.exe" src="https://img.shields.io/badge/DOWNLOAD-tmnt2net--launcher.exe-8BE836?style=for-the-badge&labelColor=5B3FD0" height="46"></a><br>
-  <sub>One file, 5.8 MB: the mod is inside the launcher. It installs the mod, updates it and starts the game.</sub>
+  <sub>One file, 5.9 MB: the mod is inside the launcher. It installs the mod, updates it and starts the game.</sub>
 </p>
 
 <p align="center">
@@ -71,6 +71,7 @@ interface is in Russian.
 | **Updates with one button** | the new version is downloaded from GitHub, checked against its SHA-256 and installed; settings and saves stay |
 | **Tells you whether you can still play with friends** | it shows the network protocol of both versions: "does not join 0.16.7 — update the whole team" |
 | **Updates itself** | a new version of the mod arrives as a new launcher, which takes the old one's place |
+| **Sets the game up** | the Graphics, Sound and Controls tabs: the picture, the volume and the keys, before the game starts |
 | **Waits while the game is open** | or asks it to close, the way its window's close button does |
 | **Works where GitHub is hard to reach** | it tries the Windows settings, a VPN client on the same PC, or your proxy |
 | **Removes the mod** | one button in its settings: exactly what was installed is removed |
@@ -80,6 +81,11 @@ interface is in Russian.
     <td align="center" width="33%"><img src="docs/images/launcher-downloading.png" alt="The launcher: downloading an update" width="285"><br><sub>An update: download, SHA-256 check, install</sub></td>
     <td align="center" width="33%"><img src="docs/images/launcher-running.png" alt="The launcher: the game is open" width="285"><br><sub>The game is open — the launcher waits</sub></td>
     <td align="center" width="33%"><img src="docs/images/launcher-settings.png" alt="The launcher: settings" width="285"><br><sub>Settings: proxy, logs, removing the mod, accent colour</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/launcher-graphics.png" alt="The launcher: the Graphics tab" width="285"><br><sub>Graphics: the same rows as the game's OPTIONS → SCREEN page</sub></td>
+    <td align="center" width="33%"><img src="docs/images/launcher-sound.png" alt="The launcher: the Sound tab" width="285"><br><sub>Sound: volume, intro movies, running in the background</sub></td>
+    <td align="center" width="33%"><img src="docs/images/launcher-controls.png" alt="The launcher: the Controls tab" width="285"><br><sub>Controls: keys and mouse buttons, layouts</sub></td>
   </tr>
 </table>
 
@@ -280,7 +286,7 @@ The detailed pages are in Russian.
 
 ## Versions and compatibility
 
-The current version is **0.17.1**; it is shown under the game's title menu.
+The current version is **0.17.2**; it is shown under the game's title menu.
 
 In a network game everyone needs a compatible version of the mod: the game must run identically on every PC,
 so any change to how it plays also changes the protocol version. The host refuses a player with an
@@ -288,7 +294,7 @@ incompatible version and says why.
 
 | Mod versions | Play together |
 |---|---|
-| 0.17.1 | with 0.17.1 only |
+| 0.17.1 – 0.17.2 | yes |
 | 0.17.0 | with 0.17.0 only |
 | 0.16.6 – 0.16.7 | yes |
 | 0.16.4 – 0.16.5 | yes |

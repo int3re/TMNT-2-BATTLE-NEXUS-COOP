@@ -110,6 +110,7 @@ constexpr int kKeyMouseLeft = 0xF0, kKeyMouseRight = 0xF1, kKeyMouse4 = 0xF3, kK
 // (__thiscall) gives them to CGameSound: SetSeConfig 0x51B0D0, SetBgmConfig 0x51B090, SetVoiceConfig
 // 0x51B110 (__cdecl(int volume)).
 constexpr int kOptSound = 0x08;
+constexpr int kSoundLevels = 4, kSoundLevelMax = 10;  // SE, BGM, voice: three ints after the mode
 constexpr uintptr_t kSoundOptionApply = 0x484110;
 constexpr uint8_t kSoundOptionApplyHead[] = {0x56, 0x8B, 0xF1, 0x8B, 0x06, 0x85, 0xC0, 0xB9, 0x0A, 0x00, 0x00, 0x00};
 constexpr uintptr_t kSoundVolume[3] = {0x51B0D0, 0x51B090, 0x51B110};

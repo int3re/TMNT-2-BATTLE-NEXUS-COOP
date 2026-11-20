@@ -8,7 +8,8 @@
 //   --where [--out file]                                     where the game is found from here
 // Tests: --settings <ini>, --cache <dir>, --repo <url> (the repository served from elsewhere), --pick <dir>
 // (the answer of the folder dialog), --drive "<script>" (the window stays hidden; wait:ms, click:name,
-// until:screen:ms, type:text, shot:file, quit), --out <file> (a log of what happened).
+// until:screen:ms, type:text, shot:file, keydown:vk:scan:extended, rdown, xdown:n, state, quit), --out <file>
+// (a log of what happened).
 #include "launcher/launcher.h"
 
 #include <dwmapi.h>
@@ -20,6 +21,7 @@
 #include <memory>
 #include <thread>
 
+#include "launcher/gameset.h"
 #include "launcher/res.h"
 
 namespace lz {
@@ -93,11 +95,19 @@ void flash(const std::wstring& text, int ms = 4500) {
   dirty();
 }
 
+// The game's settings of the ГРАФИКА, ЗВУК and УПРАВЛЕНИЕ pages, as the game's folder has them now.
+void load_game_settings() {
+  gset::load(g.has_game ? g.set.game_dir : std::wstring(), g.inst.present ? g.inst.version : std::wstring());
+  g.capture = -1;
+  logf(std::wstring(L"game settings: ") + (gset::has_mod() ? L"read" : L"no tmnt2net.ini"));
+}
+
 void refresh_installed() {
   g.has_game = core::has_game(g.set.game_dir);
   g.exe_ok = !g.has_game || core::exe_supported(g.set.game_dir);
   g.inst = g.has_game ? core::read_installed(g.set.game_dir) : Installed{};
   if (g.inst.present && !g.inst.protocol) g.inst.protocol = core::known_protocol(g.rel, g.inst.version);
+  if (g.screen == Screen::Settings && g.tab != Tab::Launcher) load_game_settings();
 }
 
 // What there is to install: GitHub's version if it is newer than the one inside this launcher (and its
@@ -407,6 +417,38 @@ void fix(Fix f) {
   }
 }
 
+// A setting of the game was not written: why, in the footer.
+void say_why() {
+  flash(gset::error().empty() ? std::wstring(L"Настройка не записалась") : gset::error(), 8000);
+}
+
+// УПРАВЛЕНИЕ: the key (or mouse button) for the action that waits for one.
+void bind_key(int code) {
+  const int action = g.capture;
+  if (action < 0) return;
+  if (!gset::key_allowed(code)) {  // (the cell goes on waiting)
+    flash(code == 0x1C || code == 0x9C ? std::wstring(L"Enter — это Start и «выбрать» в меню: игра его не отдаёт")
+          : code == 0xC8 || code == 0xD0 || code == 0xCB || code == 0xCD ? std::wstring(L"Стрелки ходят и так, всегда: назначать их не нужно")
+          : L"Эту клавишу игра не берёт: " + gset::key_name(code));
+    return;
+  }
+  g.capture = -1;
+  bool ok = gset::set_key(action, code);
+  logf(std::wstring(L"key ") + core::wide(gset::action_key(action)) + L" = " + std::to_wstring(code) + (ok ? L"" : L": NOT WRITTEN"));
+  if (!ok) say_why();
+  dirty();
+}
+
+// A row of the game's settings: one of its parts was pressed.
+void act_row(int id) {
+  const gset::Row r = static_cast<gset::Row>((id - H_Row) / kRowParts);
+  const int part = (id - H_Row) % kRowParts, v = gset::value(r);
+  const int to = part == P_Prev || part == P_Minus ? v - 1 : part == P_Next || part == P_Plus ? v + 1 : part - P_Item;
+  bool ok = gset::set(r, to);
+  logf(std::wstring(L"set ") + core::wide(gset::key(r)) + L" = " + gset::name(r, gset::value(r)) + (ok ? L"" : L": NOT WRITTEN"));
+  if (!ok) say_why();
+}
+
 void act(int id) {
   logf(L"press " + std::to_wstring(id));
   if (id != H_ProxyField && g.proxy_focus) {
@@ -414,6 +456,18 @@ void act(int id) {
     core::save_settings(g.set);
   }
   if (id != H_Uninstall) g.confirm_uninstall = false;
+  if (id != H_Key + g.capture) g.capture = -1;  // (a press elsewhere: the cell waits no more)
+  if (id >= H_Row && id < H_Row + gset::kRows * kRowParts) {
+    act_row(id);
+    dirty();
+    return;
+  }
+  if (id >= H_Key && id < H_Key + gset::kKeyActions) {
+    if (g.capture == id - H_Key) bind_key(gset::kMouseLeft);  // (a second press on the waiting cell: the mouse's own button)
+    else g.capture = id - H_Key;
+    dirty();
+    return;
+  }
   switch (id) {
     case H_Close:
       g_cancel = true;
@@ -428,8 +482,34 @@ void act(int id) {
       } else {
         g.back = g.screen;
         set_screen(Screen::Settings);
+        if (g.tab != Tab::Launcher) load_game_settings();
       }
       break;
+    case H_Tab0:
+    case H_Tab1:
+    case H_Tab2:
+    case H_Tab3:
+      g.tab = static_cast<Tab>(id - H_Tab0);
+      if (g.tab != Tab::Launcher) load_game_settings();
+      break;
+    case H_Reset: {
+      bool ok = g.tab == Tab::Graphics ? gset::reset(1) : g.tab == Tab::Sound ? gset::reset(2) : g.tab == Tab::Controls ? gset::reset_keys() : true;
+      logf(ok ? L"page: defaults" : L"page: defaults NOT WRITTEN");
+      if (!ok) say_why();
+      break;
+    }
+    case H_KeysOne:
+    case H_KeysTwo:
+      if (!gset::set_keyboard_players(id == H_KeysTwo ? 2 : 1)) say_why();
+      logf(L"keyboard players = " + std::to_wstring(gset::keyboard_players()));
+      break;
+    case H_LayoutPrev:
+    case H_LayoutNext: {
+      const int now = gset::layout(), n = now == 2 || gset::has_own_layout() ? 3 : 2;
+      if (!gset::set_layout((now + (id == H_LayoutNext ? 1 : n - 1)) % n)) say_why();
+      logf(L"layout = " + std::to_wstring(gset::layout()));
+      break;
+    }
     case H_Back:
       if (g.screen == Screen::Settings) set_screen(g.back);
       break;
@@ -589,6 +669,16 @@ void paint(HWND hwnd) {
   g_dirty = false;
 }
 
+// A key of the keyboard as DirectInput numbers it (what the game's key table holds): its scan code, with
+// 0x80 for the keys of the extended set. Pause and Num Lock come the other way round.
+int dik_of(WPARAM vk, LPARAM lp) {
+  if (vk == VK_PAUSE) return 0xC5;
+  if (vk == VK_NUMLOCK) return 0x45;
+  int scan = static_cast<int>((lp >> 16) & 0xFF);
+  if (!scan) scan = static_cast<int>(MapVirtualKeyW(static_cast<UINT>(vk), MAPVK_VK_TO_VSC)) & 0xFF;
+  return scan | ((lp >> 24) & 1 ? 0x80 : 0);
+}
+
 int hit_at(float x, float y) {
   for (size_t i = g_hits.size(); i-- > 0;) {
     const Hit& h = g_hits[i];
@@ -615,12 +705,65 @@ int hit_by_name(const std::wstring& n) {
                {L"accent2", H_Accent2}, {L"accent3", H_Accent3}};
   for (auto& x : names)
     if (n == x.name) return x.id;
+  // the settings' pages: tab.graphics, reset, keys.one, layout.next, key.jump, row.mode.next, row.music.b7, row.intro.s1
+  static const struct {
+    const wchar_t* name;
+    int id;
+  } more[] = {{L"tab.launcher", H_Tab0}, {L"tab.graphics", H_Tab1}, {L"tab.sound", H_Tab2}, {L"tab.controls", H_Tab3},
+              {L"reset", H_Reset}, {L"keys.one", H_KeysOne}, {L"keys.two", H_KeysTwo}, {L"layout.prev", H_LayoutPrev},
+              {L"layout.next", H_LayoutNext}};
+  for (auto& x : more)
+    if (n == x.name) return x.id;
+  if (n.rfind(L"key.", 0) == 0) {
+    for (int a = 0; a < gset::kKeyActions; ++a)
+      if (n.substr(4) == core::wide(gset::action_key(a))) return H_Key + a;
+  } else if (n.rfind(L"row.", 0) == 0) {
+    const size_t dot = n.find(L'.', 4);
+    if (dot == std::wstring::npos) return H_None;
+    const std::wstring row = n.substr(4, dot - 4), part = n.substr(dot + 1);
+    for (int r = 0; r < gset::kRows; ++r) {
+      if (row != core::wide(gset::key(static_cast<gset::Row>(r)))) continue;
+      const int base = H_Row + r * kRowParts;
+      if (part == L"prev") return base + P_Prev;
+      if (part == L"next") return base + P_Next;
+      if (part == L"minus") return base + P_Minus;
+      if (part == L"plus") return base + P_Plus;
+      if (part.size() > 1 && (part[0] == L'b' || part[0] == L's')) return base + P_Item + _wtoi(part.c_str() + 1);
+    }
+  }
   return H_None;
+}
+
+// What the game's settings pages hold, for the log of a script.
+void log_state() {
+  std::wstring line = std::wstring(L"state: mod ") + (gset::has_mod() ? L"1" : L"0") + L" levels " + (gset::keeps_levels() ? L"1" : L"0");
+  for (int r = 0; r < gset::kRows; ++r) {
+    const gset::Row row = static_cast<gset::Row>(r);
+    line += L" | " + core::wide(gset::key(row)) + L"=" + gset::name(row, gset::value(row));
+  }
+  logf(line);
+  line = L"state: players " + std::to_wstring(gset::keyboard_players()) + L" layout " + std::to_wstring(gset::layout()) +
+         (gset::has_own_layout() ? L" (own kept)" : L"") + L" capture " + std::to_wstring(g.capture) + L" keys";
+  for (int a = 0; a < gset::kKeyActions; ++a) line += L" " + core::wide(gset::action_key(a)) + L"=" + gset::key_name(gset::key_code(a));
+  logf(line);
+  logf(L"state: file " + gset::ini_file());
 }
 
 bool save_shot(const std::wstring& file, float scale) {
   g.time = (GetTickCount64() - g_start) / 1000.0;
   return gfx::save_png(file.c_str(), kW, kH, scale, [](gfx::Canvas& c) { view::draw(c, g, nullptr); });
+}
+
+std::vector<std::wstring> split(const std::wstring& s, wchar_t sep) {
+  std::vector<std::wstring> out;
+  size_t p = 0;
+  while (p <= s.size()) {
+    size_t e = s.find(sep, p);
+    if (e == std::wstring::npos) e = s.size();
+    if (e > p) out.push_back(s.substr(p, e - p));
+    p = e + 1;
+  }
+  return out;
 }
 
 // The test script: one step at a time, from the timer.
@@ -676,6 +819,18 @@ void drive() {
       if (!g_hwnd) return;
     } else if (op == L"type") {
       for (wchar_t ch : arg) SendMessageW(g_hwnd, WM_CHAR, ch, 0);
+    } else if (op == L"keydown") {  // keydown:<virtual key>:<scan code>:<extended 0 | 1>, as the keyboard sends it
+      std::vector<std::wstring> f = split(arg, L':');
+      if (f.size() == 3) {
+        LPARAM lp = 1 | (static_cast<LPARAM>(wcstol(f[1].c_str(), nullptr, 0) & 0xFF) << 16) | (static_cast<LPARAM>(_wtoi(f[2].c_str()) & 1) << 24);
+        SendMessageW(g_hwnd, WM_KEYDOWN, static_cast<WPARAM>(wcstol(f[0].c_str(), nullptr, 0)), lp);
+      }
+    } else if (op == L"rdown") {
+      SendMessageW(g_hwnd, WM_RBUTTONDOWN, MK_RBUTTON, MAKELPARAM(4, 60));
+    } else if (op == L"xdown") {
+      SendMessageW(g_hwnd, WM_XBUTTONDOWN, MAKEWPARAM(0, _wtoi(arg.c_str()) == 2 ? XBUTTON2 : XBUTTON1), MAKELPARAM(4, 60));
+    } else if (op == L"state") {
+      log_state();
     } else if (op == L"shot") {
       logf(L"shot " + arg + (save_shot(arg, 1) ? L"" : L": FAILED"));
     } else if (op == L"quit") {
@@ -734,6 +889,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       return 0;  // (no maximizing)
     case WM_SYSCOMMAND:
       if ((wp & 0xFFF0) == SC_MAXIMIZE) return 0;
+      if ((wp & 0xFFF0) == SC_KEYMENU) return 0;  // (Alt opens no menu: it is a key a cell of УПРАВЛЕНИЕ may take)
       break;
     case WM_MOUSEMOVE: {
       float s = scale_of(hwnd);
@@ -778,7 +934,29 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       if (was && id == was) act(id);
       return 0;
     }
+    case WM_KILLFOCUS:
+      if (g.capture >= 0) g.capture = -1, dirty();
+      break;
+    case WM_RBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_XBUTTONDOWN:
+      if (g.capture < 0) break;
+      if (msg == WM_MBUTTONDOWN) flash(L"Средняя кнопка мыши занята: она возвращает обычное расстояние камеры");
+      else bind_key(msg == WM_RBUTTONDOWN ? gset::kMouseRight : HIWORD(wp) == XBUTTON1 ? gset::kMouse4 : gset::kMouse5);
+      return msg == WM_XBUTTONDOWN ? TRUE : 0;
+    case WM_SYSKEYDOWN:
+      if (g.capture < 0) break;  // (Alt and F10 are keys like any other for a cell that waits)
+      [[fallthrough]];
     case WM_KEYDOWN:
+      if (g.capture >= 0) {
+        if (wp == VK_ESCAPE) {
+          g.capture = -1;
+          dirty();
+        } else if (!(lp & (1 << 30))) {  // (not a held key's repeat)
+          bind_key(dik_of(wp, lp));
+        }
+        return 0;
+      }
       if (g.proxy_focus) {
         if (wp == VK_RETURN || wp == VK_ESCAPE || wp == VK_TAB) {
           g.proxy_focus = false;
@@ -878,18 +1056,6 @@ int headless(int verb, const std::wstring& dir, bool quiet, const std::wstring& 
   }
   if (!g_out.empty()) logf(log);
   return r == pkg::Result::Ok ? 0 : 2;
-}
-
-std::vector<std::wstring> split(const std::wstring& s, wchar_t sep) {
-  std::vector<std::wstring> out;
-  size_t p = 0;
-  while (p <= s.size()) {
-    size_t e = s.find(sep, p);
-    if (e == std::wstring::npos) e = s.size();
-    if (e > p) out.push_back(s.substr(p, e - p));
-    p = e + 1;
-  }
-  return out;
 }
 
 int run(int argc, wchar_t** argv) {

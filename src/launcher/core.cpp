@@ -32,7 +32,7 @@ const struct {
   const wchar_t *from, *to;
   int protocol;
 } kProtocols[] = {
-    {L"0.17.1", L"0.17.1", 16}, {L"0.17.0", L"0.17.0", 15}, {L"0.16.6", L"0.16.7", 14}, {L"0.16.4", L"0.16.5", 13}, {L"0.16.3", L"0.16.3", 12},
+    {L"0.17.1", L"0.17.2", 16}, {L"0.17.0", L"0.17.0", 15}, {L"0.16.6", L"0.16.7", 14}, {L"0.16.4", L"0.16.5", 13}, {L"0.16.3", L"0.16.3", 12},
     {L"0.16.0", L"0.16.2", 11}, {L"0.14.0", L"0.15.0", 10}, {L"0.13.0", L"0.13.0", 9},  {L"0.12.2", L"0.12.2", 8},
     {L"0.12.0", L"0.12.1", 7},  {L"0.10.0", L"0.11.0", 6},  {L"0.9.0", L"0.9.1", 5},    {L"0.8.0", L"0.8.0", 4},
 };
@@ -438,6 +438,8 @@ Step wait_for_game(const std::wstring& dir, const UpdateHooks& hooks, const std:
 }
 
 }  // namespace
+
+std::wstring downloads_dir() { return cache_dir(); }
 
 std::wstring join(const std::wstring& dir, const std::wstring& name) {
   if (dir.empty()) return name;
