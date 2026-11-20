@@ -34,6 +34,7 @@ const wchar_t* kExe = L"TMNT2.exe";
 // The NA retail exe of 2004 (also in every known Russian release): the only one tmnt2net patches.
 const char* kExeSha256 = "22f49908bcd3b84278bea888b7285e1e0ba73a72a89764f495aceb76a42d8b6a";
 bool g_quiet = false;
+bool g_console = false;  // quiet, and there is a console to report to
 
 // --- small helpers ------------------------------------------------------------------
 
@@ -46,8 +47,8 @@ std::wstring join(const std::wstring& dir, const std::wstring& name) {
 bool exists(const std::wstring& p) { return GetFileAttributesW(p.c_str()) != INVALID_FILE_ATTRIBUTES; }
 
 void message(const std::wstring& text, bool error = false) {
-  if (g_quiet) {
-    fwprintf(error ? stderr : stdout, L"%ls\n", text.c_str());
+  if (g_quiet) {  // (started by a program without a console, the launcher: nothing to write to)
+    if (g_console) fwprintf(error ? stderr : stdout, L"%ls\n", text.c_str());
     return;
   }
   MessageBoxW(nullptr, text.c_str(), kTitle, MB_OK | (error ? MB_ICONERROR : MB_ICONINFORMATION));
@@ -461,11 +462,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
       dir = a;
   }
   LocalFree(argv);
-  if (g_quiet) {  // print to the parent console
-    AttachConsole(ATTACH_PARENT_PROCESS);
+  if (g_quiet && AttachConsole(ATTACH_PARENT_PROCESS)) {  // print to the parent console, if it has one
     FILE* f;
-    freopen_s(&f, "CONOUT$", "w", stdout);
-    freopen_s(&f, "CONOUT$", "w", stderr);
+    g_console = freopen_s(&f, "CONOUT$", "w", stdout) == 0 && freopen_s(&f, "CONOUT$", "w", stderr) == 0;
   }
   int rc;
   if (action != kNone && !dir.empty()) {

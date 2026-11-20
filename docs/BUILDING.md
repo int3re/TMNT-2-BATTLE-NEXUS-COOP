@@ -99,6 +99,7 @@ cmake --build build --config Release
 | `tmnt2net` | `tmnt2net.asi` и папку `build/dist/<конфигурация>` |
 | `tmnt2net_common` | общая библиотека: журнал, SHA-256, транспорты, лобби Steam, протокол |
 | `tmnt2net_setup` | `tmnt2net-setup.exe` |
+| `tmnt2net_launcher` | `tmnt2net-launcher.exe`: [лаунчер](LAUNCHER.md) |
 | `minhook`, `enet` | сторонние библиотеки |
 
 ## Установка собранного мода
@@ -127,4 +128,26 @@ python tools/gen_postfx.py
    `src/common/protocol.h`: игроки с разными версиями протокола вместе играть не должны. Подробнее — в
    [устройстве мода](ARCHITECTURE.md#версия-протокола).
 3. Описать изменения в `dist/README.md` и в [истории версий](CHANGELOG.md).
-4. Собрать `Release` и выложить `tmnt2net-setup.exe`.
+4. Заполнить `dist/release.json`: версия, протокол, дата, заголовок и до четырёх коротких заметок — их
+   показывает [лаунчер](LAUNCHER.md); в `protocols` добавить новую версию.
+5. Собрать `Release` и сделать описание релиза для лаунчера:
+
+   ```
+   python tools/release_manifest.py build/Release/tmnt2net-setup.exe build/Release/tmnt2net-launcher.exe build/Release/tmnt2net-latest.json
+   ```
+
+6. Выложить в релиз три файла: `tmnt2net-setup.exe`, `tmnt2net-launcher.exe` и `tmnt2net-latest.json`.
+   Без последнего лаунчер узнает только номер версии и поставит мод без сверки контрольной суммы.
+
+## Лаунчер
+
+Собирается целью `tmnt2net_launcher`, ничего стороннего ему не нужно: Direct2D, DirectWrite и WinHTTP есть
+в Windows. Его версия — `kLauncherVersion` в `src/launcher/launcher.h`.
+
+- Шрифты лежат в `src/launcher/assets/fonts` и встраиваются в exe. Их делает `tools/launcher_fonts.py`
+  (нужны `fontTools` и `brotli`) из файлов Google Fonts; лицензии — рядом. Шрифт заголовков, Dela Gothic
+  One, встраивается, только если в этой папке есть `DelaGothicOne-Regular.ttf`; без него заголовки рисует
+  Arial Black из Windows.
+- Значок делает `tools/launcher_icon.py` (нужен `Pillow`).
+- Любой экран можно нарисовать в файл, не показывая окна: `tmnt2net-launcher.exe --shot update out.png`.
+  Остальные ключи проверки — на [странице лаунчера](LAUNCHER.md#разработчикам).

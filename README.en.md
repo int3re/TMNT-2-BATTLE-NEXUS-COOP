@@ -161,13 +161,22 @@ Everything is set up inside the game, in its own font and style.
 
 ## Quick start
 
-1. Download `tmnt2net-setup.exe` from [Releases](../../releases/latest).
-2. Run it and choose to install or update the mod. The installer finds the game and checks it.
-3. Start the game. The mod's version appears under the title menu, along with two new items: network play
-   (**СЕТЕВАЯ ИГРА**) and mod settings (**НАСТРОЙКИ МОДА**).
+<img src="docs/images/launcher-update.png" alt="The launcher: a new version of the mod is out" width="400" align="right">
 
-> The installer is not signed with a certificate, so Windows may show "Windows protected your PC". Click
-> "More info" → "Run anyway".
+1. Download `tmnt2net-launcher.exe` from [Releases](../../releases/latest) and run it.
+2. The launcher finds the game, downloads the newest version of the mod, checks it and installs it. From
+   then on it offers updates and starts the game. Its interface is in Russian; details are on the
+   [launcher page](docs/LAUNCHER.md).
+3. Press the green button (**ИГРАТЬ**, play). The mod's version appears under the title menu, along with
+   two new items: network play (**СЕТЕВАЯ ИГРА**) and mod settings (**НАСТРОЙКИ МОДА**).
+
+Without the launcher: download `tmnt2net-setup.exe` from the same page, run it and choose to install or
+update the mod.
+
+> Neither the launcher nor the installer is signed with a certificate, so Windows may show "Windows
+> protected your PC". Click "More info" → "Run anyway".
+
+<br clear="right">
 
 Playing together:
 
@@ -217,13 +226,14 @@ The detailed pages are in Russian.
 | Page | What it covers |
 |---|---|
 | [What is added and changed](docs/TOUR.md) | a tour in pictures: every menu and every change |
+| [Launcher](docs/LAUNCHER.md) | one-button install and updates, its settings, a proxy for GitHub |
 | [Installation](docs/INSTALL.md) | installing, updating, removing, what goes where |
 | [Network play](docs/NETPLAY.md) | getting together, joining a running game, dropped links, saves |
 | [Controls](docs/CONTROLS.md) | keyboard, mouse, gamepads, two players on one keyboard |
 | [Settings](docs/SETTINGS.md) | the in-game settings pages and the `tmnt2net.ini` reference |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | common questions and what to attach to a bug report |
 | [Changelog](docs/CHANGELOG.md) | what changed from version to version, network compatibility |
-| [Building](docs/BUILDING.md) | building the mod and the installer from source |
+| [Building](docs/BUILDING.md) | building the mod, the installer and the launcher from source |
 | [Architecture](docs/ARCHITECTURE.md) | how network play works, modules, protocol |
 | [Reverse-engineering notes](re/notes.md) | addresses, structures and evidence for `TMNT2.exe` (in English) |
 

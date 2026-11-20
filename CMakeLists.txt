@@ -189,3 +189,38 @@ if(EXISTS ${UAL_DLL})
   add_custom_command(TARGET tmnt2net_setup POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:tmnt2net_setup> ${CMAKE_BINARY_DIR}/dist/$<CONFIG>/)
 endif()
+
+# --- tmnt2net-launcher.exe: finds the game, asks GitHub for the newest release, installs it, starts the game ---
+# Direct2D + DirectWrite + WinHTTP: nothing but Windows. The fonts are in the exe (src/launcher/assets/fonts,
+# made by tools/launcher_fonts.py); the headings' font, Dela Gothic One, only if its file is there.
+set(LAUNCHER_FONTS ${CMAKE_SOURCE_DIR}/src/launcher/assets/fonts)
+set(LAUNCHER_FONT_FILES ${LAUNCHER_FONTS}/Onest-Regular.ttf ${LAUNCHER_FONTS}/Onest-Medium.ttf ${LAUNCHER_FONTS}/Onest-SemiBold.ttf
+                        ${LAUNCHER_FONTS}/Onest-Bold.ttf ${LAUNCHER_FONTS}/JetBrainsMono-Medium.ttf
+                        ${LAUNCHER_FONTS}/JetBrainsMono-Bold.ttf)
+set(LAUNCHER_DISPLAY_RC "")
+if(EXISTS ${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf)
+  set(LAUNCHER_DISPLAY_RC "RES_FONT_DISPLAY RCDATA \"${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf\"")
+  list(APPEND LAUNCHER_FONT_FILES ${LAUNCHER_FONTS}/DelaGothicOne-Regular.ttf)
+else()
+  message(STATUS "Launcher: no DelaGothicOne-Regular.ttf in ${LAUNCHER_FONTS}: headings in a system font")
+endif()
+configure_file(src/launcher/launcher.rc.in ${CMAKE_BINARY_DIR}/launcher.rc @ONLY)
+set_source_files_properties(${CMAKE_BINARY_DIR}/launcher.rc PROPERTIES OBJECT_DEPENDS
+                            "${LAUNCHER_FONT_FILES};${CMAKE_SOURCE_DIR}/src/launcher/assets/launcher.ico")
+add_executable(tmnt2net_launcher WIN32
+  src/launcher/main.cpp
+  src/launcher/view.cpp
+  src/launcher/gfx.cpp
+  src/launcher/core.cpp
+  src/launcher/net.cpp
+  src/common/sha256.cpp
+  src/launcher/launcher.manifest
+  ${CMAKE_BINARY_DIR}/launcher.rc)
+target_include_directories(tmnt2net_launcher PRIVATE src)
+target_compile_definitions(tmnt2net_launcher PRIVATE ${OUR_DEFS})
+target_compile_options(tmnt2net_launcher PRIVATE ${OUR_OPTS})
+target_link_libraries(tmnt2net_launcher PRIVATE d2d1 dwrite windowscodecs winhttp ws2_32 dwmapi ole32 shell32 advapi32 bcrypt)
+set_target_properties(tmnt2net_launcher PROPERTIES OUTPUT_NAME "tmnt2net-launcher")
+add_custom_command(TARGET tmnt2net_launcher POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist/$<CONFIG>
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:tmnt2net_launcher> ${CMAKE_BINARY_DIR}/dist/$<CONFIG>/)
