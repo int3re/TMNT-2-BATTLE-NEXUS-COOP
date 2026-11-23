@@ -353,23 +353,17 @@ cmake --build build --config Release
 ## Как это работает
 
 ```mermaid
-flowchart LR
-    subgraph H["ПК хоста"]
-        KH[Клавиатура / геймпад] --> MH[tmnt2net.asi]
-        MH <--> GH[TMNT2.exe]
-    end
-    subgraph A["ПК игрока 2"]
-        KA[Клавиатура / геймпад] --> MA[tmnt2net.asi]
-        MA <--> GA[TMNT2.exe]
-    end
-    subgraph B["ПК игрока 3"]
-        KB[Клавиатура / геймпад] --> MB[tmnt2net.asi]
-        MB <--> GB[TMNT2.exe]
-    end
-    MA -- "свои нажатия" --> MH
-    MB -- "свои нажатия" --> MH
-    MH -- "нажатия всех игроков на каждый кадр" --> MA
-    MH -- "нажатия всех игроков на каждый кадр" --> MB
+sequenceDiagram
+    participant A as ПК игрока 2
+    participant H as ПК хоста
+    participant B as ПК игрока 3
+    A->>H: свои нажатия
+    B->>H: свои нажатия
+    Note over H: собирает нажатия всех игроков в пакет кадра
+    H->>A: пакет кадра
+    H->>B: пакет кадра
+    Note over A,B: каждый ПК выполняет кадр с одним и тем же вводом
+    Note over A,B: раз в 30 кадров ПК сверяют контрольные суммы
 ```
 
 Мод — это `tmnt2net.asi`, который [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)

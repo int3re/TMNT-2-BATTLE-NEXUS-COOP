@@ -369,23 +369,17 @@ of the repository; where CMake expects them, and how to build with or without St
 ## How it works
 
 ```mermaid
-flowchart LR
-    subgraph H["The host's PC"]
-        KH[Keyboard / gamepad] --> MH[tmnt2net.asi]
-        MH <--> GH[TMNT2.exe]
-    end
-    subgraph A["Player 2's PC"]
-        KA[Keyboard / gamepad] --> MA[tmnt2net.asi]
-        MA <--> GA[TMNT2.exe]
-    end
-    subgraph B["Player 3's PC"]
-        KB[Keyboard / gamepad] --> MB[tmnt2net.asi]
-        MB <--> GB[TMNT2.exe]
-    end
-    MA -- "its own input" --> MH
-    MB -- "its own input" --> MH
-    MH -- "every player's input for every frame" --> MA
-    MH -- "every player's input for every frame" --> MB
+sequenceDiagram
+    participant A as Player 2's PC
+    participant H as Host's PC
+    participant B as Player 3's PC
+    A->>H: own input
+    B->>H: own input
+    Note over H: gathers everyone's input into a frame bundle
+    H->>A: frame bundle
+    H->>B: frame bundle
+    Note over A,B: every PC runs the frame with the same input
+    Note over A,B: every 30 frames the PCs compare checksums
 ```
 
 The mod is `tmnt2net.asi`, loaded into the game's process by
