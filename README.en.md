@@ -39,12 +39,34 @@ picture and controls up to date.
 > The mod contains no game files and never changes `TMNT2.exe` on disk: every change is made in memory when the
 > game starts. You need your own copy of the game.
 
-The same kind of mod for the first game of the series, *TMNT* (2003):
-[int3re/TMNT-2003-COOP](https://github.com/int3re/TMNT-2003-COOP).
+The same kind of mod for other games: [TMNT (2003)](https://github.com/int3re/TMNT-2003-COOP) ·
+[The Incredibles: Rise of the Underminer](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) — see [Other mods](#other-mods).
 
-> **Language.** The mod was developed and tested with a Russian release of the game, so the screenshots and
-> the detailed documentation in [`docs/`](docs/) are in Russian. The mod's own menu texts have English
-> counterparts for copies of the game whose font has no Russian letters; that path is far less tested.
+> **Language.** The mod was developed and tested with a Russian release of the game, so the screenshots are
+> in Russian, and so is the launcher. The full documentation is in English in [`docs/en/`](docs/en/README.md)
+> and in Russian in [`docs/`](docs/README.md). The mod's own menu texts have English counterparts for copies of
+> the game whose font has no Russian letters; that path is far less tested.
+
+## Contents
+
+- [The launcher: one file](#the-launcher-one-file)
+- [What the mod adds and changes](#what-the-mod-adds-and-changes)
+- [The mod's menus](#the-mods-menus)
+- [Features](#features)
+- [Quick start](#quick-start)
+- [Controls](#controls)
+- [Requirements](#requirements)
+- [Documentation](#documentation)
+- [Versions and compatibility](#versions-and-compatibility)
+- [Project status](#project-status)
+- [Building from source](#building-from-source)
+- [How it works](#how-it-works)
+- [Contributing](#contributing)
+- [Credits](#credits)
+- [Thank the author](#thank-the-author)
+- [License](#license)
+- [Legal](#legal)
+- [Other mods](#other-mods)
 
 ## The launcher: one file
 
@@ -89,7 +111,7 @@ interface is in Russian.
   </tr>
 </table>
 
-Details (in Russian): **[the launcher page](docs/LAUNCHER.md)**. Without a window, from a command line:
+Details: **[the launcher page](docs/en/LAUNCHER.md)**. Without a window, from a command line:
 `tmnt2net-launcher.exe /install "game folder" /quiet`.
 
 ## What the mod adds and changes
@@ -113,11 +135,11 @@ Details (in Russian): **[the launcher page](docs/LAUNCHER.md)**. Without a windo
 | **Game speed** | 53–57 frames per second | exactly 60 |
 | **Gamepads** | Xbox pads have their buttons mixed up | Xbox, PlayStation, Switch Pro |
 | **Mouse** | not used | attacks on the mouse buttons, the wheel zooms the camera |
-| **Title menu** | new game, continue, options, quit | plus network play and mod settings |
+| **Title menu** | new game, continue, options, quit | plus NETWORK GAME and MOD SETTINGS |
 | **Installing and updating** | — | one file: [the launcher](#the-launcher-one-file) installs the mod, updates it and starts the game |
 
-A page with a screenshot for every menu and every change (in Russian):
-**[docs/TOUR.md](docs/TOUR.md)**.
+A page with a screenshot for every menu and every change:
+**[docs/en/TOUR.md](docs/en/TOUR.md)**.
 
 ## The mod's menus
 
@@ -126,12 +148,12 @@ Everything is set up inside the game, in its own font and style.
 <table>
   <tr>
     <td align="center"><img src="docs/images/menu-title.jpg" alt="Title menu" width="245"><br><sub>Title menu: two new items and the mod's version</sub></td>
-    <td align="center"><img src="docs/images/net-start.png" alt="Network play" width="245"><br><sub>Network play: open your game or join a friend</sub></td>
+    <td align="center"><img src="docs/images/net-start.png" alt="Network play" width="245"><br><sub>NETWORK GAME: host a game or join a friend</sub></td>
     <td align="center"><img src="docs/images/lobby.png" alt="Host page" width="245"><br><sub>Host page: places, readiness, ping, code</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/images/screen-page.png" alt="Screen" width="245"><br><sub>Options → Screen: window, resolution, picture</sub></td>
-    <td align="center"><img src="docs/images/mod-settings.png" alt="Mod settings" width="245"><br><sub>Mod settings: keys, gamepads, intro movies</sub></td>
+    <td align="center"><img src="docs/images/mod-settings.png" alt="Mod settings" width="245"><br><sub>MOD SETTINGS: keys, gamepads, intro movies</sub></td>
     <td align="center"><img src="docs/images/select.jpg" alt="Character select" width="245"><br><sub>Character select: costumes and player names</sub></td>
   </tr>
   <tr>
@@ -216,11 +238,11 @@ Everything is set up inside the game, in its own font and style.
 ## Quick start
 
 1. Download **[`tmnt2net-launcher.exe`](https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP/releases/latest/download/tmnt2net-launcher.exe)** and run it. It is the only file: the mod is inside it. Every
-   version is on the [Releases](../../releases/latest) page.
+   version is on the [Releases](https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP/releases/latest) page.
 2. The launcher finds the game. Press the green button: first **УСТАНОВИТЬ МОД** (install the mod), then
    **ИГРАТЬ** (play).
-3. The mod's version appears under the game's title menu, along with two new items: network play
-   (**СЕТЕВАЯ ИГРА**) and mod settings (**НАСТРОЙКИ МОДА**).
+3. The mod's version appears under the game's title menu, along with two new items: **NETWORK GAME**
+   (СЕТЕВАЯ ИГРА) and **MOD SETTINGS** (НАСТРОЙКИ МОДА).
 
 > The launcher is not signed with a certificate, so Windows may show "Windows protected your PC". Click
 > "More info" → "Run anyway".
@@ -229,17 +251,17 @@ Playing together:
 
 | | Host | Everyone else |
 |---|---|---|
-| 1 | Network play → **open your game** | Network play → **join a friend** → the host's game |
+| 1 | NETWORK GAME → **HOST A GAME** | NETWORK GAME → **JOIN A FRIEND** → the host's game |
 | 2 | waits until everyone is in the list | wait in the title menu |
-| 3 | **START** | the game begins by itself |
+| 3 | **START THE GAME** | the game begins by itself |
 | 4 | New game or Continue | everyone presses Start at character select |
 
 Steam must be running and the players must be Steam friends. Without Steam, the host copies a code from the
-host page and the others enter it under "join by code".
+host page and the others enter it under **JOIN BY CODE**.
 
 ## Controls
 
-The default keys are the game's own. The second column is the "WASD + mouse" layout from the mod settings.
+The default keys are the game's own. The second column is the "WASD + mouse" layout from MOD SETTINGS.
 
 | Action | Game default | WASD + mouse | Gamepad (Xbox / PlayStation) |
 |---|---|---|---|
@@ -268,21 +290,23 @@ Keys and gamepad buttons can be reassigned in the game's options.
 
 ## Documentation
 
-The detailed pages are in Russian.
+Every page exists in two languages: English in [`docs/en/`](docs/en/README.md), Russian in
+[`docs/`](docs/README.md).
 
 | Page | What it covers |
 |---|---|
-| [What is added and changed](docs/TOUR.md) | a tour in pictures: every menu and every change |
-| [Launcher](docs/LAUNCHER.md) | one-button install and updates, its settings, a proxy for GitHub |
-| [Installation](docs/INSTALL.md) | installing, updating, removing, what goes where |
-| [Network play](docs/NETPLAY.md) | getting together, joining a running game, dropped links, saves |
-| [Controls](docs/CONTROLS.md) | keyboard, mouse, gamepads, two players on one keyboard |
-| [Settings](docs/SETTINGS.md) | the in-game settings pages and the `tmnt2net.ini` reference |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | common questions and what to attach to a bug report |
-| [Changelog](docs/CHANGELOG.md) | what changed from version to version, network compatibility |
-| [Building](docs/BUILDING.md) | building the mod and the launcher from source |
-| [Architecture](docs/ARCHITECTURE.md) | how network play works, modules, protocol |
-| [Reverse-engineering notes](re/notes.md) | addresses, structures and evidence for `TMNT2.exe` (in English) |
+| [What is added and changed](docs/en/TOUR.md) | a tour in pictures: every menu and every change |
+| [Launcher](docs/en/LAUNCHER.md) | one-button install and updates, its settings, a proxy for GitHub |
+| [Installation](docs/en/INSTALL.md) | installing, updating, removing, what goes where |
+| [Network play](docs/en/NETPLAY.md) | getting together, joining a running game, dropped links, saves |
+| [Controls](docs/en/CONTROLS.md) | keyboard, mouse, gamepads, two players on one keyboard |
+| [Settings](docs/en/SETTINGS.md) | the in-game settings pages and the `tmnt2net.ini` reference |
+| [Troubleshooting](docs/en/TROUBLESHOOTING.md) | common questions and what to attach to a bug report |
+| [Changelog](docs/en/CHANGELOG.md) | what changed from version to version, network compatibility |
+| [Building](docs/en/BUILDING.md) | building the mod and the launcher from source |
+| [Architecture](docs/en/ARCHITECTURE.md) | how network play works, modules, protocol |
+| [Reverse-engineering notes](re/notes.md) | addresses, structures and evidence for `TMNT2.exe` |
+| [Contributing](CONTRIBUTING.en.md) | how to report a bug, the rules of working with the code |
 
 ## Versions and compatibility
 
@@ -300,7 +324,30 @@ incompatible version and says why.
 | 0.16.4 – 0.16.5 | yes |
 | 0.16.3 | with 0.16.3 only |
 | 0.16.0 – 0.16.2 | yes |
-| 0.15.0 and older | see the [changelog](docs/CHANGELOG.md) |
+| 0.15.0 and older | see the [changelog](docs/en/CHANGELOG.md) |
+
+## Project status
+
+The mod is in active development: version **0.17.3**, launcher **1.3.1**. What changed in every version, and
+why, is in the [changelog](docs/en/CHANGELOG.md).
+
+- **Network play** has been played in real games over Steam; the desyncs found in them from the players' logs
+  were fixed in the 0.16.x versions. The 0.17.x versions were checked on two to four copies of the game on one
+  PC: the copies' frame logs match. There are no reports from real games on 0.17.x yet.
+- **The launcher** is checked by scripts without showing its window; its self-update was verified against the
+  real GitHub.
+
+Known limits:
+
+- The mod works with one `TMNT2.exe`: the North American 2004 release (Russian releases use the same file). With
+  any other file the mod changes nothing in the game, and the launcher warns you beforehand.
+- There is no exclusive full screen "as in the original": a borderless window over the whole monitor takes its
+  place. In real full screen the game froze on Alt+Tab, and a network game waited on every PC.
+- In a network game one person plays on one PC: that PC's keyboard and gamepad are one player of the session.
+- The launcher is in Russian. The mod's texts inside the game exist in Russian and in English; the English ones
+  are far less tested.
+- Anything that depends on the active window — taking the keyboard, the real mouse — is not covered by the test
+  bench: it is known from ordinary play only.
 
 ## Building from source
 
@@ -317,9 +364,29 @@ cmake --build build --config Release
 
 The files and the launcher end up in `build/dist/Release`. SDL2, ENet and Ultimate ASI Loader are not part
 of the repository; where CMake expects them, and how to build with or without Steam, is described in
-[docs/BUILDING.md](docs/BUILDING.md).
+[docs/en/BUILDING.md](docs/en/BUILDING.md).
 
 ## How it works
+
+```mermaid
+flowchart LR
+    subgraph H["The host's PC"]
+        KH[Keyboard / gamepad] --> MH[tmnt2net.asi]
+        MH <--> GH[TMNT2.exe]
+    end
+    subgraph A["Player 2's PC"]
+        KA[Keyboard / gamepad] --> MA[tmnt2net.asi]
+        MA <--> GA[TMNT2.exe]
+    end
+    subgraph B["Player 3's PC"]
+        KB[Keyboard / gamepad] --> MB[tmnt2net.asi]
+        MB <--> GB[TMNT2.exe]
+    end
+    MA -- "its own input" --> MH
+    MB -- "its own input" --> MH
+    MH -- "every player's input for every frame" --> MA
+    MH -- "every player's input for every frame" --> MB
+```
 
 The mod is `tmnt2net.asi`, loaded into the game's process by
 [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader). At start-up it checks the SHA-256
@@ -337,30 +404,77 @@ The launcher is a separate program with no dependencies: Direct2D and DirectWrit
 for the network. The mod's files are in its resources. A new version arrives as a new launcher, which is
 downloaded, checked against the SHA-256 of the release and opened as data, never run.
 
-More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+More in [docs/en/ARCHITECTURE.md](docs/en/ARCHITECTURE.md).
 
-## Credits and legal
+## Contributing
 
-- [xntrz/tmnt2](https://github.com/xntrz/tmnt2) — an open reimplementation of the game's code; class and
-  function names were matched against it.
-- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) by ThirteenAG — the mod loader.
-- [MinHook](https://github.com/TsudaKageyu/minhook) — function hooks.
-- [SDL2](https://www.libsdl.org/) — gamepads.
-- [ENet](http://enet.bespin.org/) — networking over UDP.
-- Steamworks SDK — networking over Steam. The SDK is not part of this repository.
-- The launcher's fonts: [Dela Gothic One](https://github.com/syakuzen/DelaGothic),
-  [Onest](https://github.com/googlefonts/onest) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono).
+Bug reports and suggestions go to [Issues](https://github.com/int3re/TMNT-2-BATTLE-NEXUS-COOP/issues). Attach
+`tmnt2net.log`, and for a network problem `tmnt2net.log` and `tmnt2net-sim.log` **from every PC** that took
+part, plus the `tmnt2net-desync-*.log` files if the games went apart: without the other side's logs a network
+bug usually cannot be found. The launcher opens them from its settings: «Открыть журнал» (Open the log) and
+«Журналы рассинхрона» (Desync logs). What else to say is in
+[How to report a bug](docs/en/TROUBLESHOOTING.md#how-to-report-a-bug).
 
-### License
+How the code is laid out, which rules in it are not up for discussion and how to check a change:
+[CONTRIBUTING.en.md](CONTRIBUTING.en.md).
 
-The mod's code is released under the [MIT license](LICENSE). Third-party libraries keep their own licenses:
-MinHook — BSD 2-Clause, SDL2 — zlib, ENet — MIT, Ultimate ASI Loader — MIT, the launcher's fonts — SIL Open
-Font License 1.1. The game, its files and its artwork are not covered by the mod's license.
+## Credits
+
+| Who and what | What for | License |
+|---|---|---|
+| [xntrz/tmnt2](https://github.com/xntrz/tmnt2) | an open reimplementation of the game's code: class and function names were matched against it. No code of it is in the mod | — |
+| [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (ThirteenAG) | loads the mod into the game | MIT |
+| [MinHook](https://github.com/TsudaKageyu/minhook) (Tsuda Kageyu) | hooks on the game's functions | BSD 2-Clause |
+| [SDL2](https://www.libsdl.org/) | Xbox, PlayStation and Switch Pro gamepads | zlib |
+| [ENet](http://enet.bespin.org/) (Lee Salzman) | networking over UDP: LAN, IP, code | MIT |
+| [Steamworks SDK](https://partner.steamgames.com/) (Valve) | networking over Steam, lobbies and invites. The SDK is not part of this repository | Valve's license |
+| [Dela Gothic One](https://github.com/syakuzen/DelaGothic), [Onest](https://github.com/googlefonts/onest), [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | the launcher's fonts | SIL OFL 1.1 |
+
+And special thanks to:
+
+- everyone who played the early versions and sent their logs: the desyncs were found and fixed from them;
+- the makers of the game: Konami made *TMNT 2: Battle Nexus* in 2004, and the mod exists only because people
+  still want to play it together.
+
+## Thank the author
+
+The mod is free. If it was of use to you and you would like to say thanks, you can send USDT to any of these
+addresses:
+
+| Network | Address |
+|---|---|
+| TRON (TRC20) | `TVdy7i7qoF1ZdrnNSZaC5Mgz1ZddaMhw4y` |
+| The Open Network (TON) | `UQB-oxQVLLN3hm-YRGfr5-XJ95P0zIAeLFstgG40HiaR8oMz` |
+| BNB Smart Chain (BEP20) | `0xA11f8221952FA5f540bC528072213b14F124379B` |
+
+USDT only, and only on the network named next to the address; the smallest amount is 0.1 USDT. On BNB Smart
+Chain USDT is the token with the contract
+[`0x55d398326f99059fF775485246999027B3197955`](https://bscscan.com/token/0x55d398326f99059fF775485246999027B3197955).
+
+## License
+
+The mod's code is released under the [MIT license](LICENSE). Third-party libraries keep their own licenses (see
+the table above); the launcher's fonts are in [`src/launcher/assets/fonts`](src/launcher/assets/fonts) together
+with the texts of their licenses. The game, its files and its artwork are not covered by the mod's license.
+
+## Legal
 
 This is an unofficial fan project. It is not affiliated with or endorsed by Konami, Mirage Studios, Viacom or
 any other rights holder. *Teenage Mutant Ninja Turtles* and related names and characters are trademarks of
-their owners. The screenshots show the mod at work and are included for illustration; the player names in
-them are made up.
+their owners. The repository and the releases contain no files of the game: the mod needs your own copy. The
+screenshots show the mod at work and are included for illustration; the player names in them are made up. The
+launcher's look is its own: it uses neither the game's logo nor its characters.
 
 For Steam networking the mod uses the AppID of Valve's test application Spacewar (480), so Steam shows the
 status "Spacewar" during a network game.
+
+## Other mods
+
+The same network co-op — a copy of the game and a screen of their own for every player, a one-file launcher —
+exists for two more games:
+
+| Game | Mod | Players |
+|---|---|---|
+| *Teenage Mutant Ninja Turtles* (2003) | [TMNT-2003-COOP](https://github.com/int3re/TMNT-2003-COOP) · tmntnet | up to 4 |
+| *TMNT 2: Battle Nexus* (2004) | this repository · tmnt2net | up to 4 |
+| *The Incredibles: Rise of the Underminer* (2005) | [INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) · in2net | 2 |
