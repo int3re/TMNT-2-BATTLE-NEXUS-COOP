@@ -38,8 +38,8 @@
 > Мод не содержит файлов игры и не меняет `TMNT2.exe` на диске: все изменения делаются в памяти при запуске.
 > Нужна своя копия игры.
 
-Такие же моды для других игр: [TMNT (2003)](https://github.com/int3re/TMNT-2003-COOP) · [Суперсемейка: Подземная битва](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) —
-см. [Другие моды](#другие-моды).
+Такие же моды для других игр: [TMNT (2003)](https://github.com/int3re/TMNT-2003-COOP) · [Суперсемейка: Подземная битва](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) ·
+[TMNT Mutant Melee](https://github.com/int3re/TMNT-MUTANT-MELEE-COOP) — см. [Другие моды](#другие-моды).
 
 ## Содержание
 
@@ -446,7 +446,7 @@ Smart Chain USDT — это токен с контрактом
 
 ## Другие моды
 
-Такой же сетевой кооператив — своя копия игры и свой экран у каждого, лаунчер в один файл — сделан ещё для двух
+Такой же сетевой кооператив — своя копия игры и свой экран у каждого, лаунчер в один файл — сделан ещё для трёх
 игр:
 
 | Игра | Мод | Игроков |
@@ -454,3 +454,4 @@ Smart Chain USDT — это токен с контрактом
 | *Teenage Mutant Ninja Turtles* (2003) | [TMNT-2003-COOP](https://github.com/int3re/TMNT-2003-COOP) · tmntnet | до 4 |
 | *TMNT 2: Battle Nexus* (2004) | этот репозиторий · tmnt2net | до 4 |
 | *The Incredibles: Rise of the Underminer* (2005), «Суперсемейка: Подземная битва» | [INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) · in2net | 2 |
+| *TMNT Mutant Melee* (2005) | [TMNT-MUTANT-MELEE-COOP](https://github.com/int3re/TMNT-MUTANT-MELEE-COOP) · meleenet | до 4 |

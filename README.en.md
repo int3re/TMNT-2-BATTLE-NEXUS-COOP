@@ -40,7 +40,8 @@ picture and controls up to date.
 > game starts. You need your own copy of the game.
 
 The same kind of mod for other games: [TMNT (2003)](https://github.com/int3re/TMNT-2003-COOP) ·
-[The Incredibles: Rise of the Underminer](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) — see [Other mods](#other-mods).
+[The Incredibles: Rise of the Underminer](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) ·
+[TMNT Mutant Melee](https://github.com/int3re/TMNT-MUTANT-MELEE-COOP) — see [Other mods](#other-mods).
 
 > **Language.** The mod was developed and tested with a Russian release of the game, so the screenshots are
 > in Russian, and so is the launcher. The full documentation is in English in [`docs/en/`](docs/en/README.md)
@@ -465,10 +466,11 @@ status "Spacewar" during a network game.
 ## Other mods
 
 The same network co-op — a copy of the game and a screen of their own for every player, a one-file launcher —
-exists for two more games:
+exists for three more games:
 
 | Game | Mod | Players |
 |---|---|---|
 | *Teenage Mutant Ninja Turtles* (2003) | [TMNT-2003-COOP](https://github.com/int3re/TMNT-2003-COOP) · tmntnet | up to 4 |
 | *TMNT 2: Battle Nexus* (2004) | this repository · tmnt2net | up to 4 |
 | *The Incredibles: Rise of the Underminer* (2005) | [INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP](https://github.com/int3re/INCREDIBLES-RISE-OF-THE-UNDERMINER-COOP) · in2net | 2 |
+| *TMNT Mutant Melee* (2005) | [TMNT-MUTANT-MELEE-COOP](https://github.com/int3re/TMNT-MUTANT-MELEE-COOP) · meleenet | up to 4 |
